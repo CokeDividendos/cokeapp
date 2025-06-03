@@ -73,7 +73,7 @@ def safe_history(ticker: str, *, period: str, interval: str) -> pd.DataFrame:
 # --------------------------
 st.set_page_config(
     page_title="Plataforma de Análisis", 
-    page_icon="Coke Dividendos (8).png",  # Asegúrate de que esta imagen se encuentre en la carpeta del proyecto
+    page_icon="🧮",  # Asegúrate de que esta imagen se encuentre en la carpeta del proyecto
     layout="wide"
 )
 

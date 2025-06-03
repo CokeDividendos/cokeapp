@@ -33,14 +33,21 @@ IS_CLOUD = os.getenv("STREAMLIT_CLOUD", "0") == "1"
 # ──────────────────────────────────────────────────────────────
 # 3) Sesión “Chrome” (sólo local) para burlar algunos filtros de YF
 # ──────────────────────────────────────────────────────────────
+
+YF_SESSION = None        # <- declarar variable global
+
 if not IS_CLOUD:
     try:
-        from curl_cffi import requests as curl_requests        # pip install curl-cffi
+        from curl_cffi import requests as curl_requests  # pip install curl-cffi
         _chrome = curl_requests.Session(impersonate="chrome")
-        yf.set_requests_session(_chrome)
+        YF_SESSION = _chrome                            # <-- la guardamos
+        # set_requests_session sólo existe en yfinance >=0.2.36
+        if hasattr(yf, "set_requests_session"):
+            yf.set_requests_session(_chrome)
         st.info("🕸️ Usando sesión curl_cffi (modo Chrome)")
     except Exception as e:
         st.warning(f"No se cargó curl_cffi: {e}")
+
 
 # ──────────────────────────────────────────────────────────────
 # 4) Envoltorio con reintentos para history()  – 4 intentos máx.
@@ -125,9 +132,9 @@ with tabs[0]:
     # Descargar Datos desde Yahoo Finance
     # --------------------------
     try:
-        ticker_data = yf.Ticker(ticker_input, session=YF_SESSION)
-        price_data = safe_history(ticker_input, period=selected_period, interval=selected_interval)
-        
+        ticker_data = yf.Ticker(ticker_input, session=YF_SESSION)  # ✔ ya definida
+        price_data  = safe_history(ticker_input,period=selected_period,interval=selected_interval)
+    
         if price_data.empty:
             st.warning("No se encontraron datos para ese ticker. Revisa el símbolo.")
             

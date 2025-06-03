@@ -125,7 +125,7 @@ with tabs[0]:
         with col_logo:
             if logo_url: st.image(logo_url, width=90)
         with col_title:
-            st.title(f"📊 {info.get('longName', ticker_input)}")
+            st.title(f" {info.get('longName', ticker_input)}")
             # sector / industria justo bajo el título
             st.markdown(f"**🏷️ Sector:** {info.get('sector','N/D')}   |   **🏭 Industria:** {info.get('industry','N/D')}")
 
@@ -136,7 +136,11 @@ with tabs[0]:
         # A partir de aquí TODO tu código de métricas, gráficos, etc. permanece igual
         #  (no lo repito para ahorrar espacio — no lo borres en tu archivo)
         # ----------------------------------------------------------------------------------
-        
+
+        # ……………………………………………………………………………………………………………………………………
+        # 👇  PEGAR AQUÍ el resto de tu lógica (BLOQUES 1-6) tal cual la tenías
+        # ……………………………………………………………………………………………………………………………………
+
         else:
             # ==========================
             # BLOQUE 1: Información General y Datos Clave (Cálculos Básicos)
@@ -1570,8 +1574,5 @@ with tabs[0]:
 
     except Exception as e:
         st.error(f"Ocurrió un error al obtener los datos: {e}")
-
-            
-    st.subheader("")  # Espacio extra
 
             

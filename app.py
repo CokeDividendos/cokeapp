@@ -74,16 +74,6 @@ def safe_history(ticker: str, *, period: str, interval: str) -> pd.DataFrame:
 #  (UI, lógicas, gráficos, etc.) va inmediatamente después. 👇
 # ╚═══════════════════════════════════════════════════════════════╝
 
-
-# --------------------------
-# Configuración de la App
-# --------------------------
-st.set_page_config(
-    page_title="Plataforma de Análisis", 
-    page_icon="🧮",  # Asegúrate de que esta imagen se encuentre en la carpeta del proyecto
-    layout="wide"
-)
-
 # Crear las pestañas horizontales con st.tabs
 # --------------------------
 tabs = st.tabs(["Valoración y Análisis Financiero", "Seguimiento de Cartera", "Analizar ETF's", "Finanzas Personales", "Calculadora de Interés Compuesto"])

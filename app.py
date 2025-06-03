@@ -1,68 +1,50 @@
-# ╔═══════════════════════════════════════════════════════════════╗
-#  📦 Imports
-# ╚═══════════════════════════════════════════════════════════════╝
-import os, datetime, json, requests, time
+# ╔═════════════  Coke-App v0.4  (logo, sector/industria, resumen‐IA, UI móvil) ═════════════╗
+# 1) IMPORTS & CONFIG  ───────────────────────────────────────────────────────────────────────
+import os, datetime, requests, textwrap
 from pathlib import Path
-from datetime import date, timedelta
+from datetime import timedelta
 
-import streamlit as st              #  ← 1.º importamos Streamlit
-import pandas as pd
-import numpy as np
-import yfinance as yf
-import plotly.graph_objects as go
-import plotly.express as px
-import requests_cache
-import tenacity                     # <- reintentos exponenciales
+import streamlit as st          #  ← SIEMPRE el primer import de tu app
+import pandas as pd, plotly.graph_objects as go, plotly.express as px
+import yfinance as yf, requests_cache, tenacity
 
-# ──────────────────────────────────────────────────────────────
-# 0)  ❗ CONFIGURACIÓN DE PÁGINA  (DEBE SER EL *PRIMER* COMANDO st.*)
-# ──────────────────────────────────────────────────────────────
+# ───── 1-A  page config (¡debe ser la PRIMERA llamada st.*!) ────────────────────────────────
 st.set_page_config(
     page_title="Plataforma de Análisis",
-    page_icon="assets/logo.png",          # sustituye por tu PNG si luego lo subes a /assets
+    page_icon="🧮",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
-# --- Estilos adaptativos ------------------------------------------------------
+
+# ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
 st.markdown(
     """
     <style>
-    /* elimina márgenes y hace que cada “element-container” ocupe el ancho completo
-       cuando la pantalla es menor de 750 px (≈móvil en vertical) */
-    @media (max-width: 750px) {
-        .main .block-container { padding: 1rem 0.5rem; }
-        .element-container       { width: 100%   !important; }
-        .stTabs [data-baseweb="tab-list"] button  { font-size:0.9rem; }
+    html, body, [class*="css"]  { font-family: "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+    @media (max-width:750px){
+        .main .block-container{padding:1rem .5rem}
+        .element-container{width:100%!important}
+        h1,h2{font-size:1.2rem}
     }
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
-# ╔═══════════════════════════════════════════════════════════════╗
-#  💾 “Infraestructura”: caché HTTP, sesión YF, helper seguro
-# ╚═══════════════════════════════════════════════════════════════╝
-# 1) Caché HTTP – 24 h (cachea 404 y 429)
+# ╔═════════════ 2) “INFRAESTRUCTURA”: CACHE HTTP + SESIÓN YF  ═══════════════════════════════
 requests_cache.install_cache(
     "yf_cache",
-    expire_after=datetime.timedelta(hours=24),
+    expire_after=timedelta(hours=24),
     allowable_codes=(200, 203, 300, 301, 404, 429),
-    allowable_methods=("GET", "POST"),)
+    allowable_methods=("GET", "POST"),
+)
 
-# ──────────────────────────────────────────────────────────────
-# 2) ¿Estamos en Streamlit Cloud?
-# ──────────────────────────────────────────────────────────────
-IS_CLOUD = os.getenv("STREAMLIT_CLOUD") == "1"
-
-# ──────────────────────────────────────────────────────────────
-# 3) Sesión “Chrome” (sólo local) para burlar algunos filtros de YF
-# ──────────────────────────────────────────────────────────────
-
+IS_CLOUD   = os.getenv("STREAMLIT_CLOUD") == "1"
 YF_SESSION = None
 if not IS_CLOUD:
     try:
-        from curl_cffi import requests as curl_requests  # pip install curl-cffi
-        _chrome = curl_requests.Session(impersonate="chrome")
+        from curl_cffi import requests as curl_requests          # pip install curl-cffi
+        _chrome   = curl_requests.Session(impersonate="chrome")
         YF_SESSION = _chrome
         if hasattr(yf, "set_requests_session"):
             yf.set_requests_session(_chrome)
@@ -70,88 +52,90 @@ if not IS_CLOUD:
     except Exception as e:
         st.warning(f"No se cargó curl_cffi: {e}")
 
+@tenacity.retry(stop=tenacity.stop_after_attempt(4),
+                wait=tenacity.wait_exponential(multiplier=2,min=2,max=10),
+                reraise=True)
+def safe_history(ticker:str,*,period:str,interval:str):
+    return yf.Ticker(ticker,session=YF_SESSION).history(period=period,interval=interval)
 
-# ──────────────────────────────────────────────────────────────
-# 4) Envoltorio con reintentos para history()  – 4 intentos máx.
-# ──────────────────────────────────────────────────────────────
-@tenacity.retry(
-    stop=tenacity.stop_after_attempt(4),
-    wait=tenacity.wait_exponential(multiplier=2, min=2, max=10),
-    reraise=True,
-)
-def safe_history(ticker: str, *, period: str, interval: str) -> pd.DataFrame:
-    return yf.Ticker(ticker, session=YF_SESSION).history(
-        period=period, interval=interval
-    )
+# ╔═════════════ 3) HELPERS  (logo y resumen IA) ═════════════════════════════════════════════
+@st.cache_data(show_spinner=False, ttl=60*60*24)
+def get_logo_url(info:dict)->str|None:
+    """Devuelve un logo PNG. 1️⃣ Yahoo → 2️⃣ Clearbit → None"""
+    if (logo:=info.get("logo_url")):           # algunos tickers lo traen
+        return logo
+    domain = (info.get("website") or "").split("//")[-1].split("/")[0]
+    if domain:
+        return f"https://logo.clearbit.com/{domain}"
+    return None
 
-
-# ╔═══════════════════════════════════════════════════════════════╗
-#  Hasta aquí la sección “infraestructura”.  El resto de tu código
-#  (UI, lógicas, gráficos, etc.) va inmediatamente después. 👇
-# ╚═══════════════════════════════════════════════════════════════╝
-
-# Crear las pestañas horizontales con st.tabs
-# --------------------------
-tabs = st.tabs(["Valoración y Análisis Financiero", "Seguimiento de Cartera", "Analizar ETF's", "Finanzas Personales", "Calculadora de Interés Compuesto"])
-
-# Pestaña 1: Valoración y Análisis Financiero (aquí se coloca todo tu código actual)
-with tabs[0]:
-
-    # Mostrar el título junto con el ícono en la cabecera
-    col1, col2 = st.columns([1, 5])
-
-    with col1:
-            # --- Logo -----------------------------------------------------------------
-        from pathlib import Path
-        ASSETS_DIR = Path(__file__).parent.parent / "assets"
-        logo_path  = ASSETS_DIR / "Coke Dividendos (8).png"
-
-    if logo_path.exists():
-        st.image(str(logo_path), width=150)
-    else:
-        st.write("🧩 (logo no encontrado)")
-
-    with col2:
-            st.title("📊 Plataforma de Análisis de Coke Dividendos")
-
-        # Colores base
-    primary_orange = "darkorange"
-    primary_blue = "deepskyblue"
-    primary_pink = "hotpink"
-    text_white = "white"
-
-    # --------------------------
-    # Entrada del Usuario
-    # --------------------------
-    ticker_input = st.text_input("🔎 Ingresa el Ticker (Ej: AAPL, MSFT, KO)", value="AAPL")
-
-    period_options = {
-        "5 años": "5y",
-        "10 años": "10y",
-        "15 años": "15y",
-        "20 años": "20y"
-    }
-    period_selection = st.selectbox("⏳ Selecciona el período de análisis:", list(period_options.keys()))
-    selected_period = period_options[period_selection]
-
-    interval_options = {
-        "Diario": "1d",
-        "Mensual": "1mo"
-    }
-    interval_selection = st.selectbox("📆 Frecuencia de datos:", list(interval_options.keys()))
-    selected_interval = interval_options[interval_selection]
-
-    # --------------------------
-    # Descargar Datos desde Yahoo Finance
-    # --------------------------
+@st.cache_data(show_spinner="💬 Traduciendo y resumiendo…", ttl=60*60*24)
+def resumen_es(short_desc_en:str)->str:
+    """Resumen en español usando OpenAI (requiere OPENAI_API_KEY en Secrets)."""
     try:
-        ticker_data = yf.Ticker(ticker_input, session=YF_SESSION)  # ✔ ya definida
-        price_data  = safe_history(ticker_input,period=selected_period,interval=selected_interval)
-    
+        import openai, os          # sólo si el usuario puso su clave
+        openai.api_key = st.secrets["OPENAI_API_KEY"]
+        prompt = textwrap.dedent(f"""
+            Resume al español en máximo 120 palabras, tono divulgativo,
+            el siguiente texto EXPLICANDO qué hace la empresa.\n\n{short_desc_en}
+        """)
+        rsp = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role":"user","content":prompt}],
+            max_tokens=180,
+            temperature=0.5,
+        )
+        return rsp.choices[0].message.content.strip()
+    except Exception:
+        return "Resumen no disponible (añade tu OPENAI_API_KEY en secrets)."
+
+# ╔═════════════ 4) IU PRINCIPAL  ════════════════════════════════════════════════════════════
+# Tabs de alto nivel
+tabs = st.tabs([
+    "Valoración y Análisis Financiero",
+    "Seguimiento de Cartera",
+    "Analizar ETF's",
+    "Finanzas Personales",
+    "Calculadora de Interés Compuesto",
+])
+# ─── Tab 0 ───────────────────────────────────────────────────────────────────────────────────
+with tabs[0]:
+    ########################  ENTRADAS  ######################################################
+    col_logo, col_title = st.columns([1, 5])
+    ticker_input = st.text_input("🔎 Ticker (ej.: AAPL, MSFT, KO)", "AAPL")
+
+    period_dict   = {"5 años":"5y","10 años":"10y","15 años":"15y","20 años":"20y"}
+    selected_period = period_dict[ st.selectbox("⏳ Período", list(period_dict)) ]
+
+    interval_dict = {"Diario":"1d","Mensual":"1mo"}
+    selected_interval = interval_dict[ st.selectbox("📆 Frecuencia", list(interval_dict)) ]
+
+    ########################  DESCARGA YF  #####################################################
+    try:
+        tk         = yf.Ticker(ticker_input, session=YF_SESSION)
+        price_data = safe_history(ticker_input, period=selected_period, interval=selected_interval)
+        info       = tk.info or {}
+
         if price_data.empty:
-            st.warning("No se encontraron datos para ese ticker. Revisa el símbolo.")
-            
-            
+            st.warning("No se encontraron datos para ese ticker.")
+            st.stop()
+
+        ########################  LOGO + TÍTULO ###############################################
+        logo_url = get_logo_url(info)
+        with col_logo:
+            if logo_url: st.image(logo_url, width=90)
+        with col_title:
+            st.title(f"📊 {info.get('longName', ticker_input)}")
+            # sector / industria justo bajo el título
+            st.markdown(f"**🏷️ Sector:** {info.get('sector','N/D')}   |   **🏭 Industria:** {info.get('industry','N/D')}")
+
+        ########################  RESUMEN BREVE IA  ###########################################
+        if info.get("longBusinessSummary"):
+            st.write(resumen_es(info["longBusinessSummary"]))
+
+        # A partir de aquí TODO tu código de métricas, gráficos, etc. permanece igual
+        #  (no lo repito para ahorrar espacio — no lo borres en tu archivo)
+        # ----------------------------------------------------------------------------------
         
         else:
             # ==========================

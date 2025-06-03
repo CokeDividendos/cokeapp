@@ -1,11 +1,11 @@
 # ╔═══════════════════════════════════════════════════════════════╗
-#  📦 Imports, caché global, gestión de sesión y helper seguro
+#  📦 Imports
 # ╚═══════════════════════════════════════════════════════════════╝
 import os, datetime, json, requests, time
 from pathlib import Path
 from datetime import date, timedelta
 
-import streamlit as st
+import streamlit as st              #  ← 1.º importamos Streamlit
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -15,33 +15,39 @@ import requests_cache
 import tenacity                     # <- reintentos exponenciales
 
 # ──────────────────────────────────────────────────────────────
-# 1) Caché HTTP – 24 h (también cachea 404 y 429 para “domar” a YF)
+# 0)  ❗ CONFIGURACIÓN DE PÁGINA  (DEBE SER EL *PRIMER* COMANDO st.*)
 # ──────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="Plataforma de Análisis",
+    page_icon="🧮",          # sustituye por tu PNG si luego lo subes a /assets
+    layout="wide",
+)
+
+# ╔═══════════════════════════════════════════════════════════════╗
+#  💾 “Infraestructura”: caché HTTP, sesión YF, helper seguro
+# ╚═══════════════════════════════════════════════════════════════╝
+# 1) Caché HTTP – 24 h (cachea 404 y 429)
 requests_cache.install_cache(
     "yf_cache",
     expire_after=datetime.timedelta(hours=24),
     allowable_codes=(200, 203, 300, 301, 404, 429),
-    allowable_methods=("GET", "POST"),
-)
+    allowable_methods=("GET", "POST"),)
 
 # ──────────────────────────────────────────────────────────────
 # 2) ¿Estamos en Streamlit Cloud?
 # ──────────────────────────────────────────────────────────────
-IS_CLOUD = os.getenv("STREAMLIT_CLOUD", "0") == "1"
-# (En tu máquina local no existirá la variable, por lo que será False)
+IS_CLOUD = os.getenv("STREAMLIT_CLOUD") == "1"
 
 # ──────────────────────────────────────────────────────────────
 # 3) Sesión “Chrome” (sólo local) para burlar algunos filtros de YF
 # ──────────────────────────────────────────────────────────────
 
-YF_SESSION = None        # <- declarar variable global
-
+YF_SESSION = None
 if not IS_CLOUD:
     try:
         from curl_cffi import requests as curl_requests  # pip install curl-cffi
         _chrome = curl_requests.Session(impersonate="chrome")
-        YF_SESSION = _chrome                            # <-- la guardamos
-        # set_requests_session sólo existe en yfinance >=0.2.36
+        YF_SESSION = _chrome
         if hasattr(yf, "set_requests_session"):
             yf.set_requests_session(_chrome)
         st.info("🕸️ Usando sesión curl_cffi (modo Chrome)")
@@ -58,8 +64,9 @@ if not IS_CLOUD:
     reraise=True,
 )
 def safe_history(ticker: str, *, period: str, interval: str) -> pd.DataFrame:
-    """Llama a yfinance.Ticker().history con back-off exponencial."""
-    return yf.Ticker(ticker).history(period=period, interval=interval)
+    return yf.Ticker(ticker, session=YF_SESSION).history(
+        period=period, interval=interval
+    )
 
 
 # ╔═══════════════════════════════════════════════════════════════╗

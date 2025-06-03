@@ -19,8 +19,24 @@ import tenacity                     # <- reintentos exponenciales
 # ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Plataforma de Análisis",
-    page_icon="🧮",          # sustituye por tu PNG si luego lo subes a /assets
+    page_icon="assets/logo.png",          # sustituye por tu PNG si luego lo subes a /assets
     layout="wide",
+    initial_sidebar_state="collapsed"
+)
+# --- Estilos adaptativos ------------------------------------------------------
+st.markdown(
+    """
+    <style>
+    /* elimina márgenes y hace que cada “element-container” ocupe el ancho completo
+       cuando la pantalla es menor de 750 px (≈móvil en vertical) */
+    @media (max-width: 750px) {
+        .main .block-container { padding: 1rem 0.5rem; }
+        .element-container       { width: 100%   !important; }
+        .stTabs [data-baseweb="tab-list"] button  { font-size:0.9rem; }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 # ╔═══════════════════════════════════════════════════════════════╗

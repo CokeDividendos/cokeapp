@@ -30,6 +30,19 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+st.markdown(
+    """
+    <style>
+      /* Hace redondo cualquier logo descargado */
+      img[src*="logo.clearbit.com"], img[src$=".png"]{
+          border-radius:50%;             /* círculo */
+          background:#fff;               /* aro blanco opcional */
+          padding:4px;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ╔═════════════ 2) “INFRAESTRUCTURA”: CACHE HTTP + SESIÓN YF  ═══════════════════════════════
 requests_cache.install_cache(

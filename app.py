@@ -271,11 +271,6 @@ with tabs[0]:
         # --------------------------
         # Presentación: Nombre de la compañía y Gráfico de Precio Histórico
         # --------------------------
-        company_name = info.get("longName", "Nombre no disponible")
-        st.markdown(f"# {company_name}")
-
-        st.markdown(f"**🏷️ Sector:** {sector} | **🏭 Industria:** {industry}")
-
         
         st.markdown(f"### 🚨 Datos Principales de {ticker_input}")
         # Mostrar una fila de métricas con los datos clave

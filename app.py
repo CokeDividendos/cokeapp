@@ -1520,83 +1520,83 @@ with tabs[0]:
             st.markdown("#### Estado de Flujo de Efectivo en detalle")
             st.dataframe(ticker_data.cashflow.iloc[::-1], height=300)
     # --------------------------
-            # Sección: Precios Objetivo (con entrada de Yield Deseado aquí)
-            # --------------------------
-    
-            st.markdown("## 🎯 Valoración Proyectada")
-            key_cols = st.columns(4)
-            key_cols[0].metric("💰 Precio Actual", f"${price:.2f}" if price is not None else "N/A")
-            # Para calcular el Valor Infravalorado de Geraldine Weiss se utiliza la metodología a partir de datos diarios:
-            price_data_diario = ticker_data.history(period=selected_period, interval="1d")
-            dividends_daily = ticker_data.dividends
-            if not dividends_daily.empty:
-                    annual_dividends_raw = dividends_daily.resample("Y").sum()
-                    annual_dividends_raw.index = annual_dividends_raw.index.year
-                    start_year = pd.to_datetime(price_data.index[0]).year
-                    end_year = pd.to_datetime(price_data.index[-1]).year
-                    annual_dividends_gw = annual_dividends_raw[(annual_dividends_raw.index >= start_year) & (annual_dividends_raw.index <= end_year)]
-                    if len(annual_dividends_gw) >= 3:
-                        first_val_gw = annual_dividends_gw.iloc[0]
-                        penultimate_val_gw = annual_dividends_gw.iloc[-2]
-                        n_years_gw = annual_dividends_gw.index[-2] - annual_dividends_gw.index[0]
-                        cagr_gw = ((penultimate_val_gw / first_val_gw) ** (1 / n_years_gw) - 1) * 100
+        # Sección: Precios Objetivo (con entrada de Yield Deseado aquí)
+        # --------------------------
+        
+        st.markdown("## 🎯 Valoración Proyectada")
+        key_cols = st.columns(4)
+        key_cols[0].metric("💰 Precio Actual", f"${price:.2f}" if price is not None else "N/A")
+        # Para calcular el Valor Infravalorado de Geraldine Weiss se utiliza la metodología a partir de datos diarios:
+        price_data_diario = ticker_data.history(period=selected_period, interval="1d")
+        dividends_daily = ticker_data.dividends
+        if not dividends_daily.empty:
+                annual_dividends_raw = dividends_daily.resample("Y").sum()
+                annual_dividends_raw.index = annual_dividends_raw.index.year
+                start_year = pd.to_datetime(price_data.index[0]).year
+                end_year = pd.to_datetime(price_data.index[-1]).year
+                annual_dividends_gw = annual_dividends_raw[(annual_dividends_raw.index >= start_year) & (annual_dividends_raw.index <= end_year)]
+                if len(annual_dividends_gw) >= 3:
+                    first_val_gw = annual_dividends_gw.iloc[0]
+                    penultimate_val_gw = annual_dividends_gw.iloc[-2]
+                    n_years_gw = annual_dividends_gw.index[-2] - annual_dividends_gw.index[0]
+                    cagr_gw = ((penultimate_val_gw / first_val_gw) ** (1 / n_years_gw) - 1) * 100
+                else:
+                    cagr_gw = None
+                current_year = pd.Timestamp.today().year
+                def ajustar_dividendo(year):
+                    if (year == current_year) and (cagr_gw is not None) and ((year - 1) in annual_dividends_gw.index):
+                        return annual_dividends_gw[year - 1] * (1 + cagr_gw/100)
                     else:
-                        cagr_gw = None
-                    current_year = pd.Timestamp.today().year
-                    def ajustar_dividendo(year):
-                        if (year == current_year) and (cagr_gw is not None) and ((year - 1) in annual_dividends_gw.index):
-                            return annual_dividends_gw[year - 1] * (1 + cagr_gw/100)
-                        else:
-                            return annual_dividends_gw.get(year, None)
-                        monthly_data = price_data_diario.resample("M").last().reset_index()
-                        monthly_data['Año'] = monthly_data['Date'].dt.year
-                        monthly_data['Mes'] = monthly_data['Date'].dt.strftime("%B")
-                        monthly_data.rename(columns={'Close': 'Precio'}, inplace=True)
-                        monthly_data['Dividendo Anual'] = monthly_data['Año'].apply(ajustar_dividendo)
-                        monthly_data['Yield'] = monthly_data['Dividendo Anual'] / monthly_data['Precio']
-                        overall_yield_max = monthly_data['Yield'].max()
-                        monthly_data['Precio Infravalorado'] = monthly_data['Dividendo Anual'] / overall_yield_max
-                        monthly_data = monthly_data.sort_values(by='Date')
-                        valor_infravalorado = monthly_data.iloc[-1]['Precio Infravalorado']
-            else:
-                        valor_infravalorado = None
-                    
-            key_cols[1].metric("💎 Precio Infrav. G. Weiss", f"${valor_infravalorado:.2f}" if valor_infravalorado is not None else "N/A")
-            key_cols[2].metric("📊 Valor Libro Precio Justo", f"${fair_price:.2f}" if fair_price is not None else "N/A")
-            key_cols[3].metric("🚀 Precio a PER 5 años", f"${per_5y:.2f}" if per_5y is not None else "N/A")
-                    
-                    # Ahora, en esta misma sección se solicita el Yield Deseado
-            yield_deseado_obj = st.number_input("Ingrese Aquí el Yield Deseado (%)", min_value=0.1, value=3.0, step=0.1, key="yield_deseado_objetivo")
-                    
-                    # Recalcular el Precio por Dividendo Esperado:
-                    # (Dividendo Actual * (1 + (CAGR del Dividendo)/100)) / (Yield Deseado/100)
-            fair_div_price = (dividend * (1 + (cagr_dividend/100))) / (yield_deseado_obj/100) if (dividend is not None and cagr_dividend is not None and yield_deseado_obj != 0) else None
-                    
-            st.metric("⌛ Precio por Dividendo Esperado", f"${fair_div_price:.2f}" if fair_div_price is not None else "N/A")
-                    
-                    # --------------------------
-                    # Datos Relevantes (tabla)
-                    # --------------------------
-            otros_datos = {
-                        "ROE Actual": f"{roe_actual*100:.2f}%" if roe_actual is not None else "N/A",
-                        "PauOut": f"{payout_ratio*100:.2f}%" if payout_ratio is not None else "N/A",
-                        "EPS Actual": f"${eps_actual:.2f}" if eps_actual is not None else "N/A",
-                        "PER": f"{pe_ratio:.2f}" if pe_ratio is not None else "N/A",
-                        "P/B": f"{pb:.2f}" if pb is not None else "N/A",
-                        "Book/Share": f"${book_per_share:.2f}" if book_per_share is not None else "N/A",
-                        "G": f"{G_percent:.2f}%" if G_percent is not None else "N/A",
-                        "Múltiplo Crecimiento": f"{multiplier}" if multiplier is not None else "N/A",
-                        "EPS a 5 años": f"${eps_5y:.2f}" if eps_5y is not None else "N/A",
-                        "G esperado": f"{g_esperado_percent:.2f}%" if g_esperado_percent is not None else "N/A",
-                        "Dividendo Anual": f"${dividend:.2f}" if dividend is not None else "N/A",
-                        "Yield Actual": f"{yield_actual:.2f}%" if yield_actual is not None else "N/A",
-                        "CAGR del Dividendo": f"{cagr_dividend:.2f}%" if cagr_dividend is not None else "N/A",
-                        "Yield Promedio": f"{avg_yield:.2f}%" if avg_yield is not None else "N/A"
-                    }
-            df_otros = pd.DataFrame.from_dict(otros_datos, orient='index', columns=["Valor"])
-            st.markdown("### 👨‍💻 Datos Relevantes")
-            st.dataframe(df_otros)
-            st.subheader("")
+                        return annual_dividends_gw.get(year, None)
+                    monthly_data = price_data_diario.resample("M").last().reset_index()
+                    monthly_data['Año'] = monthly_data['Date'].dt.year
+                    monthly_data['Mes'] = monthly_data['Date'].dt.strftime("%B")
+                    monthly_data.rename(columns={'Close': 'Precio'}, inplace=True)
+                    monthly_data['Dividendo Anual'] = monthly_data['Año'].apply(ajustar_dividendo)
+                    monthly_data['Yield'] = monthly_data['Dividendo Anual'] / monthly_data['Precio']
+                    overall_yield_max = monthly_data['Yield'].max()
+                    monthly_data['Precio Infravalorado'] = monthly_data['Dividendo Anual'] / overall_yield_max
+                    monthly_data = monthly_data.sort_values(by='Date')
+                    valor_infravalorado = monthly_data.iloc[-1]['Precio Infravalorado']
+        else:
+                    valor_infravalorado = None
+                        
+        key_cols[1].metric("💎 Precio Infrav. G. Weiss", f"${valor_infravalorado:.2f}" if valor_infravalorado is not None else "N/A")
+        key_cols[2].metric("📊 Valor Libro Precio Justo", f"${fair_price:.2f}" if fair_price is not None else "N/A")
+        key_cols[3].metric("🚀 Precio a PER 5 años", f"${per_5y:.2f}" if per_5y is not None else "N/A")
+                        
+                # Ahora, en esta misma sección se solicita el Yield Deseado
+        yield_deseado_obj = st.number_input("Ingrese Aquí el Yield Deseado (%)", min_value=0.1, value=3.0, step=0.1, key="yield_deseado_objetivo")
+                        
+                # Recalcular el Precio por Dividendo Esperado:
+                # (Dividendo Actual * (1 + (CAGR del Dividendo)/100)) / (Yield Deseado/100)
+        fair_div_price = (dividend * (1 + (cagr_dividend/100))) / (yield_deseado_obj/100) if (dividend is not None and cagr_dividend is not None and yield_deseado_obj != 0) else None
+                        
+        st.metric("⌛ Precio por Dividendo Esperado", f"${fair_div_price:.2f}" if fair_div_price is not None else "N/A")
+                        
+                # --------------------------
+                # Datos Relevantes (tabla)
+                # --------------------------
+        otros_datos = {
+                            "ROE Actual": f"{roe_actual*100:.2f}%" if roe_actual is not None else "N/A",
+                            "PauOut": f"{payout_ratio*100:.2f}%" if payout_ratio is not None else "N/A",
+                            "EPS Actual": f"${eps_actual:.2f}" if eps_actual is not None else "N/A",
+                            "PER": f"{pe_ratio:.2f}" if pe_ratio is not None else "N/A",
+                            "P/B": f"{pb:.2f}" if pb is not None else "N/A",
+                            "Book/Share": f"${book_per_share:.2f}" if book_per_share is not None else "N/A",
+                            "G": f"{G_percent:.2f}%" if G_percent is not None else "N/A",
+                            "Múltiplo Crecimiento": f"{multiplier}" if multiplier is not None else "N/A",
+                            "EPS a 5 años": f"${eps_5y:.2f}" if eps_5y is not None else "N/A",
+                            "G esperado": f"{g_esperado_percent:.2f}%" if g_esperado_percent is not None else "N/A",
+                            "Dividendo Anual": f"${dividend:.2f}" if dividend is not None else "N/A",
+                            "Yield Actual": f"{yield_actual:.2f}%" if yield_actual is not None else "N/A",
+                            "CAGR del Dividendo": f"{cagr_dividend:.2f}%" if cagr_dividend is not None else "N/A",
+                            "Yield Promedio": f"{avg_yield:.2f}%" if avg_yield is not None else "N/A"
+                        }
+        df_otros = pd.DataFrame.from_dict(otros_datos, orient='index', columns=["Valor"])
+        st.markdown("### 👨‍💻 Datos Relevantes")
+        st.dataframe(df_otros)
+        st.subheader("")
 
 
     except Exception as e: 

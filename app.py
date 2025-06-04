@@ -100,7 +100,7 @@ def resumen_es(short_desc_en:str)->str:
         )
         return rsp.choices[0].message.content.strip()
     except Exception:
-        return "Resumen no disponible (añade tu OPENAI_API_KEY en secrets)."
+        return "Resumen no disponible"
 
 # ╔═════════════ 4) IU PRINCIPAL  ════════════════════════════════════════════════════════════
 # Tabs de alto nivel
@@ -172,12 +172,6 @@ with tabs[0]:
         text_white = "white"
         
         info = ticker_data.info
-    
-
-        # ─── Datos de negocio ─────────────────────────────────────────
-        company_name = info.get("longName", "Nombre no disponible")
-        sector       = info.get("sector",   "N/A")
-        industry     = info.get("industry", "N/A")
 
         # ─── Métricas básicas de cotización ───────────────────────────
 
@@ -1602,4 +1596,4 @@ with tabs[0]:
     except Exception as e: 
         st.error(f"Ocurrió un error al obtener los datos: {e}")
 
-        
+        git 

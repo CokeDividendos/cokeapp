@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import timedelta
 
 import streamlit as st          #  ← SIEMPRE el primer import de tu app
-import pandas as pd, plotly.graph_objects as go, plotly.express as px
+import pandas as pd, plotly.graph_objects as go, plotly.express as px, numpy as np
 import yfinance as yf, requests_cache, tenacity
 
 # ───── 1-A  page config (¡debe ser la PRIMERA llamada st.*!) ────────────────────────────────
@@ -166,7 +166,13 @@ with tabs[0]:
         # ==========================
         # BLOQUE 1: Información General y Datos Clave (Cálculos Básicos)
         # ==========================
+        primary_orange = "darkorange"
+        primary_blue = "deepskyblue"
+        primary_pink = "hotpink"
+        text_white = "white"
+        
         info = ticker_data.info
+    
 
         # ─── Datos de negocio ─────────────────────────────────────────
         company_name = info.get("longName", "Nombre no disponible")
@@ -274,7 +280,7 @@ with tabs[0]:
         company_name = info.get("longName", "Nombre no disponible")
         st.markdown(f"# {company_name}")
 
-        st.markdown(f"**🏷️ Sector:** {sector}   |   **🏭 Industria:** {industry}")
+        st.markdown(f"**🏷️ Sector:** {sector} | **🏭 Industria:** {industry}")
 
         
         st.markdown(f"### 🚨 Datos Principales de {ticker_input}")

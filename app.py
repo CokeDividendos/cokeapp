@@ -128,12 +128,15 @@ with tabs[0]:
     ########################  DESCARGA YF  #####################################################
     try:
         ticker_data = yf.Ticker(ticker_input, session=YF_SESSION)
+
+        # ⬇️ 1️⃣  CREA info ANTES de usarlo
+        info = ticker_data.info or {}
+
         price_data = safe_history(
-        ticker_input,
-        period   = selected_period,
-        interval = selected_interval,)
-
-
+            ticker_input,
+            period   = selected_period,
+            interval = selected_interval,
+        )
 
         if price_data.empty:
             st.warning("No se encontraron datos para ese ticker.")
@@ -304,7 +307,7 @@ with tabs[0]:
             showlegend=True
         ))
         fig.update_layout(
-            title=f'Precio de la acción ({period_label}, {interval_selection.lower()})',
+            title=f'Precio de la acción ({period_label}, {interval_label.lower()})',
             xaxis_title='Fecha',
             yaxis_title='Precio (USD)',
             height=500

@@ -118,16 +118,21 @@ with tabs[0]:
     ticker_input = st.text_input("🔎 Ticker (ej.: AAPL, MSFT, KO)", "AAPL")
 
     period_dict   = {"5 años":"5y","10 años":"10y","15 años":"15y","20 años":"20y"}
-    selected_period = period_dict[ st.selectbox("⏳ Período", list(period_dict)) ]
+    period_label  = st.selectbox("⏳ Período",   list(period_dict))   # lo que ve el usuario
+    selected_period = period_dict[period_label]                      # la clave que usa YF
 
     interval_dict = {"Diario":"1d","Mensual":"1mo"}
-    selected_interval = interval_dict[ st.selectbox("📆 Frecuencia", list(interval_dict)) ]
+    interval_label = st.selectbox("📆 Frecuencia", list(interval_dict))
+    selected_interval = interval_dict[interval_label]
 
     ########################  DESCARGA YF  #####################################################
     try:
         ticker_data = yf.Ticker(ticker_input, session=YF_SESSION)
-        price_data  = safe_history(...)
-        info        = ticker_data.info or {}
+        price_data = safe_history(
+        ticker_input,
+        period   = selected_period,
+        interval = selected_interval,)
+
 
 
         if price_data.empty:
@@ -299,7 +304,7 @@ with tabs[0]:
             showlegend=True
         ))
         fig.update_layout(
-            title=f'Precio de la acción ({selected_period}, {interval_selection.lower()})',
+            title=f'Precio de la acción ({period_label}, {interval_selection.lower()})',
             xaxis_title='Fecha',
             yaxis_title='Precio (USD)',
             height=500

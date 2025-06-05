@@ -768,6 +768,7 @@ with tabs[0]:
                 # Obtener EBITDA a partir del Income Statement
                 income = ticker_data.financials.transpose()
                 income.index = income.index.year
+                income = income.apply(pd.to_numeric, errors="coerce")
                 if "EBITDA" in income.columns:
                     ebitda = income["EBITDA"]
                 else:
@@ -1135,6 +1136,7 @@ with tabs[0]:
             try:
                 income = ticker_data.financials.transpose()
                 income.index = income.index.year
+                income = income.apply(pd.to_numeric, errors="coerce")
 
                 if "Total Revenue" not in income.columns or "Gross Profit" not in income.columns or "Operating Income" not in income.columns:
                     st.warning("No se encontraron suficientes datos en el Estado de Resultados para generar el gráfico de ingresos.")
@@ -1213,6 +1215,7 @@ with tabs[0]:
             try:
                 income = ticker_data.financials.transpose()
                 income.index = income.index.year
+                income = income.apply(pd.to_numeric, errors="coerce")
 
                 if 'Total Revenue' in income.columns and 'Gross Profit' in income.columns:
                     ingresos = income['Total Revenue']
@@ -1271,6 +1274,7 @@ with tabs[0]:
                 # Continuamos con la generación del gráfico de evolución del EPS (usando "Diluted EPS" si existe)
                 income = ticker_data.financials.transpose()
                 income.index = income.index.year
+                income = income.apply(pd.to_numeric, errors="coerce")
 
                 if "Diluted EPS" not in income.columns:
                     st.warning("No se encontró 'Diluted EPS' en el Estado de Resultados para este ticker.")

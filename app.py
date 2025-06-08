@@ -1,4 +1,4 @@
-# ╔═════════════  Coke-App v0.4  (logo, sector/industria, resumen‐IA, UI móvil) ═════════════╗
+# ╔═════════════  Coke-App v0.4  (logo, sector/industria, resumen-IA, UI móvil) ═════════════╗
 # 1) IMPORTS & CONFIG  ───────────────────────────────────────────────────────────────────────
 import os, datetime, requests, textwrap
 from pathlib import Path
@@ -20,25 +20,18 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    html, body, [class*="css"]  { font-family: "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+    html, body, [class*="css"]{font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
     @media (max-width:750px){
         .main .block-container{padding:1rem .5rem}
         .element-container{width:100%!important}
         h1,h2{font-size:1.2rem}
     }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-st.markdown(
-    """
-    <style>
-      /* Hace redondo cualquier logo descargado */
-      img[src*="logo.clearbit.com"], img[src$=".png"]{
-          border-radius:50%;             /* círculo */
-          background:#fff;               /* aro blanco opcional */
-          padding:4px;
-      }
+    /* Hace redondo cualquier logo descargado */
+    img[src*="logo.clearbit.com"], img[src$=".png"]{
+        border-radius:50%;
+        background:#fff;
+        padding:4px;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -54,10 +47,12 @@ requests_cache.install_cache(
 
 IS_CLOUD   = os.getenv("STREAMLIT_CLOUD") == "1"
 YF_SESSION = None
+
+# — Solo usamos curl_cffi cuando NO estamos en la nube ————————————————
 if not IS_CLOUD:
     try:
         from curl_cffi import requests as curl_requests          # pip install curl-cffi
-        _chrome   = curl_requests.Session(impersonate="chrome")
+        _chrome = curl_requests.Session(impersonate="chrome")
         YF_SESSION = _chrome
         if hasattr(yf, "set_requests_session"):
             yf.set_requests_session(_chrome)
@@ -65,11 +60,27 @@ if not IS_CLOUD:
     except Exception as e:
         st.warning(f"No se cargó curl_cffi: {e}")
 
+# ───── Funciones de descarga resiliente ─────────────────────────────────────────────────────
 @tenacity.retry(stop=tenacity.stop_after_attempt(4),
-                wait=tenacity.wait_exponential(multiplier=2,min=2,max=10),
+                wait=tenacity.wait_exponential(multiplier=2, min=2, max=10),
                 reraise=True)
-def safe_history(ticker:str,*,period:str,interval:str):
-    return yf.Ticker(ticker,session=YF_SESSION).history(period=period,interval=interval)
+def safe_history(ticker: str, *, period: str, interval: str) -> pd.DataFrame:
+    """History con reintentos usando la sesión elegida (puede lanzar HTTPError)."""
+    return yf.Ticker(ticker, session=YF_SESSION).history(period=period, interval=interval)
+
+def history_resiliente(ticker: str, *, period: str, interval: str) -> pd.DataFrame:
+    """
+    Llama a safe_history(); si Yahoo devuelve 401 (sesión invalidada)
+    reintenta inmediatamente con la sesión estándar de yfinance.
+    """
+    try:
+        return safe_history(ticker, period=period, interval=interval)
+    except requests.exceptions.HTTPError as e:
+        if getattr(e.response, "status_code", None) == 401:
+            st.warning("⚠️ Yahoo devolvió 401; reintento sin sesión especial…")
+            return yf.Ticker(ticker).history(period=period, interval=interval)
+        # cualquier otro error se propaga
+        raise
 
 # ╔═════════════ 3) HELPERS  (logo y resumen IA) ═════════════════════════════════════════════
 @st.cache_data(show_spinner=False, ttl=60*60*24)
@@ -167,318 +178,257 @@ with tabs[0]:
         # BLOQUE 1: Información General y Datos Clave (Cálculos Básicos)
         # ==========================
         primary_orange = "darkorange"
-        primary_blue = "deepskyblue"
-        primary_pink = "hotpink"
-        text_white = "white"
-        
+        primary_blue   = "deepskyblue"
+        primary_pink   = "hotpink"
+
         info = ticker_data.info
 
-        # ─── Métricas básicas de cotización ───────────────────────────
+        # ─── Conversión segura a numérico ───────────────────────────
+        price        = pd.to_numeric(info.get('currentPrice'),  errors='coerce')
+        dividend     = pd.to_numeric(info.get('dividendRate'),  errors='coerce')
+        payout_ratio = pd.to_numeric(info.get('payoutRatio'),   errors='coerce')
+        pe_ratio     = pd.to_numeric(info.get('trailingPE'),    errors='coerce')
+        roe_actual   = pd.to_numeric(info.get('returnOnEquity'),errors='coerce')
+        eps_actual   = pd.to_numeric(info.get('trailingEps'),   errors='coerce')
+        pb           = pd.to_numeric(info.get('priceToBook'),   errors='coerce')
 
-        # ─── valores por defecto para evitar NameError si hay rate‑limit ───
-        price = dividend = yield_actual = payout_ratio = pe_ratio = roe_actual = None
-        eps_actual = pb = cagr_dividend = avg_yield = total_return = annual_return = None
-        sector = industry = company_name = "N/A"
+        yield_actual = (dividend / price * 100) if pd.notna(dividend) and pd.notna(price) else None
 
-        price        = info.get('currentPrice', None)
-        dividend     = info.get('dividendRate', None)
-        yield_actual = (dividend / price * 100) if dividend and price else None
-        payout_ratio = info.get('payoutRatio', None)
-        pe_ratio     = info.get('trailingPE', None)
-        roe_actual   = info.get('returnOnEquity', None)      # decimal
-        eps_actual   = info.get('trailingEps', None)
-        pb           = info.get('priceToBook', None)
-                    
-        # Book/Share: (Capital Contable Total - Acciones preferentes) / Acciones totales en circulación.
-        try:
-            bs = ticker_data.balance_sheet.transpose()
-            capital_total = bs.get("Total Equity Gross Minority Interest", None)
-            if capital_total is not None:
-                capital_total = capital_total.iloc[0]
-        except Exception as e:
-            capital_total = None
-        preferred_shares = 0  # Se asume 0 si no se tienen datos
-        try:
-            ordinary_shares
-        except NameError:
-            ordinary_shares = info.get('sharesOutstanding', None)
-        book_per_share = (capital_total - preferred_shares) / ordinary_shares if (capital_total is not None and ordinary_shares is not None and ordinary_shares != 0) else None
-        
-        # G: Tasa de crecimiento = ROE actual * (1 - PauOut)
-        G = roe_actual * (1 - payout_ratio) if (roe_actual is not None and payout_ratio is not None) else None
-        G_percent = G * 100 if G is not None else None
-        
-        # Múltiplo de Crecimiento:
-        if G_percent is not None:
-            if G_percent <= 10:
-                multiplier = 10
-            elif 10 < G_percent <= 20:
-                multiplier = 15
-            else:
-                multiplier = 20
+        # ─── Book Value / Share ─────────────────────────────────────
+        bs = ticker_data.balance_sheet.transpose()
+        capital_total = (bs.get("Total Equity Gross Minority Interest")
+                        .iloc[0] if "Total Equity Gross Minority Interest" in bs else None)
+        capital_total = pd.to_numeric(capital_total, errors='coerce')
+
+        ordinary_shares = pd.to_numeric(info.get('sharesOutstanding'), errors='coerce')
+        preferred_shares = 0   # asumimos 0 si no hay dato
+
+        book_per_share = ((capital_total - preferred_shares) / ordinary_shares
+                        if pd.notna(capital_total) and pd.notna(ordinary_shares) and ordinary_shares!=0
+                        else None)
+
+        # ─── Crecimiento esperado y múltiplos ───────────────────────
+        G         = roe_actual * (1 - payout_ratio) if pd.notna(roe_actual) and pd.notna(payout_ratio) else None
+        G_percent = G * 100 if pd.notna(G) else None
+
+        if pd.notna(G_percent):
+            multiplier = 10 if G_percent <= 10 else 15 if G_percent <= 20 else 20
         else:
             multiplier = None
-        
-        # EPS a 5 años: EPS actual * (1 + G)^5 (G expresado en porcentaje)
-        eps_5y = eps_actual * ((1 + (G_percent/100))**5) if (eps_actual is not None and G_percent is not None) else None
-        
-        # Precio PER a 5 años: se calcula como EPS a 5 años * Múltiplo de Crecimiento
-        per_5y = eps_5y * multiplier if (eps_5y is not None and multiplier is not None) else None
-        
-        # G Esperado: ((Precio PER a 5 años / Precio Actual)^(1/5)) - 1
-        g_esperado = ((per_5y / price)**(1/5) - 1) if (per_5y is not None and price is not None and price != 0) else None
-        g_esperado_percent = g_esperado * 100 if g_esperado is not None else None
-        
-        # Valor de Precio Justo: P/B * Book/Share
-        fair_price = pb * book_per_share if (pb is not None and book_per_share is not None) else None
-        
-        # --- Cálculo del CAGR del Dividendo (usando dividendos históricos) ---
+
+        eps_5y      = eps_actual * ((1 + G_percent/100)**5) if pd.notna(eps_actual) and pd.notna(G_percent) else None
+        per_5y      = eps_5y * multiplier if pd.notna(eps_5y) and multiplier else None
+        g_esperado  = ((per_5y / price)**(1/5) - 1) if pd.notna(per_5y) and pd.notna(price) and price!=0 else None
+        g_esperado_percent = g_esperado * 100 if pd.notna(g_esperado) else None
+        fair_price  = pb * book_per_share if pd.notna(pb) and pd.notna(book_per_share) else None
+
+        # ─── CAGR del dividendo ─────────────────────────────────────
         dividends = ticker_data.dividends
         if not dividends.empty:
-            annual_dividends = dividends.resample('Y').sum()
+            annual_dividends = (dividends.resample('Y').sum()
+                                        .astype(float)
+                                        .dropna())
             annual_dividends.index = annual_dividends.index.year
-            start_year = pd.to_datetime(price_data.index[0]).year
-            end_year = pd.to_datetime(price_data.index[-1]).year
-            annual_dividends = annual_dividends[(annual_dividends.index >= start_year) & (annual_dividends.index <= end_year)]
+            start_year, end_year = price_data.index[[0,-1]].year
+            annual_dividends = annual_dividends.loc[start_year:end_year]
+
             if len(annual_dividends) >= 3:
-                first_value = annual_dividends.iloc[0]
-                penultimate_value = annual_dividends.iloc[-2]
-                n_years = annual_dividends.index[-2] - annual_dividends.index[0]
-                cagr_dividend = ((penultimate_value / first_value) ** (1 / n_years) - 1) * 100
+                first, penultimate = annual_dividends.iloc[[0,-2]]
+                n_years            = annual_dividends.index[-2] - annual_dividends.index[0]
+                cagr_dividend      = ( (penultimate/first)**(1/n_years) - 1 ) * 100
             else:
                 cagr_dividend = None
-            # Yield Promedio:
-            df_yield = price_data[['Close']].copy()
-            df_yield['Año'] = df_yield.index.year
-            dividend_map = annual_dividends.to_dict()
-            df_yield['Dividendo Anual'] = df_yield['Año'].map(dividend_map)
-            df_yield['Yield (%)'] = (df_yield['Dividendo Anual'] / df_yield['Close']) * 100
-            if len(annual_dividends) > 1:
-                max_full_year = sorted(annual_dividends.index)[-2]
-                df_yield = df_yield[df_yield['Año'] <= max_full_year]
+
+            df_yield = price_data[['Close']].assign(
+                Año            = price_data.index.year,
+                Dividendo_Anual= price_data.index.year.map(annual_dividends.to_dict())
+            )
+            df_yield['Yield (%)'] = (df_yield['Dividendo_Anual']/df_yield['Close'])*100
             avg_yield = df_yield['Yield (%)'].mean()
         else:
-            cagr_dividend = None
-            avg_yield = None
+            cagr_dividend = avg_yield = None
 
-        # ─── Retornos históricos según rango elegido ───────────────────
-        first_close   = price_data['Close'].iloc[0]
-        last_close    = price_data['Close'].iloc[-1]
-        total_return  = (last_close / first_close - 1) * 100            # %
-        years_span    = (price_data.index[-1] - price_data.index[0]).days / 365.25
-        annual_return = ((last_close / first_close) ** (1 / years_span) - 1) * 100 if years_span > 0 else None
+        # ─── Retornos históricos ────────────────────────────────────
+        first_close  = price_data['Close'].iloc[0]
+        last_close   = price_data['Close'].iloc[-1]
+        total_return = (last_close/first_close - 1)*100
+        years_span   = (price_data.index[-1] - price_data.index[0]).days / 365.25
+        annual_return= ((last_close/first_close)**(1/years_span) - 1)*100 if years_span>0 else None
 
-        # --------------------------
-        # Presentación: Nombre de la compañía y Gráfico de Precio Histórico
-        # --------------------------
-        
+        # ─── Métricas en cabecera ───────────────────────────────────
         st.markdown(f"### 🚨 Datos Principales de {ticker_input}")
-        # Mostrar una fila de métricas con los datos clave
-        col1, col2, col3, col4, col5, col6, col7= st.columns(7)
-        col1.metric("💰 Precio actual", f"${price:.2f}" if price is not None else "N/A")
-        col2.metric("🏦 Dividendo Actual", f"${dividend:.2f}" if dividend is not None else "N/A")
-        col3.metric("📈 Yield actual", f"{yield_actual:.2f}%" if yield_actual is not None else "N/A")
-        col4.metric("📊 PER actual", f"{pe_ratio:.2f}x" if pe_ratio is not None else "N/A")
-        col5.metric("🔁 PayOut actual", f"{payout_ratio*100:.2f}%" if payout_ratio is not None else "N/A")
-        col6.metric("🧾 EPS actual", f"${eps_actual:.2f}" if eps_actual is not None else "N/A")
-        col7.metric("⏳ CAGR del dividendo", f"{cagr_dividend:.2f}%" if cagr_dividend is not None else "N/A")
-        # ────────────────────────────────────────────────────────────────
-        
+        col1,col2,col3,col4,col5,col6,col7 = st.columns(7)
+        col1.metric("💰 Precio",     f"${price:.2f}"        if pd.notna(price)        else "N/D")
+        col2.metric("🏦 Dividendo",  f"${dividend:.2f}"     if pd.notna(dividend)     else "N/D")
+        col3.metric("📈 Yield",      f"{yield_actual:.2f}%" if pd.notna(yield_actual) else "N/D")
+        col4.metric("📊 PER",        f"{pe_ratio:.2f}x"     if pd.notna(pe_ratio)     else "N/D")
+        col5.metric("🔁 Pay-out",    f"{payout_ratio*100:.2f}%" if pd.notna(payout_ratio) else "N/D")
+        col6.metric("🧾 EPS",        f"${eps_actual:.2f}"   if pd.notna(eps_actual)   else "N/D")
+        col7.metric("⏳ CAGR div",   f"{cagr_dividend:.2f}%"if pd.notna(cagr_dividend)else "N/D")
 
+        # ─── Precio histórico + Drawdown ────────────────────────────
         st.subheader("##")
-        
-        #Gráfico de precio histórico
+        st.subheader("📈 Precio Histórico de la Acción")
 
-        st.subheader(f"📈 Precio Histórico de la Acción")
         fig = go.Figure()
         fig.add_trace(go.Scatter(
-            x=price_data.index,
-            y=price_data['Close'],
-            mode='lines+text',
-            name='Precio de Cierre',
-            line=dict(color=primary_blue),
-            text=[f"${y:.2f}" if i == len(price_data['Close']) - 1 else "" for i, y in enumerate(price_data['Close'])],
-            textposition="top right",
-            showlegend=True
+            x=price_data.index, y=price_data['Close'],
+            mode='lines',
+            name='Close', line=dict(color=primary_blue)
         ))
         fig.update_layout(
             title=f'Precio de la acción ({period_label}, {interval_label.lower()})',
-            xaxis_title='Fecha',
-            yaxis_title='Precio (USD)',
-            height=500
+            xaxis_title='Fecha', yaxis_title='USD', height=500
         )
-        st.plotly_chart(fig, use_container_width=True, key="plotly_chart_price")
-        
-        st.subheader(f"⚠️ Drawdown Histórico")
-        try:
-            closing_prices = price_data['Close']
-            running_max = closing_prices.cummax()
-            drawdown = (closing_prices / running_max - 1) * 100
+        st.plotly_chart(fig, use_container_width=True, key="price_history")
 
+        st.subheader("⚠️ Drawdown Histórico")
+        try:
+            running_max = price_data['Close'].cummax()
+            drawdown    = (price_data['Close']/running_max - 1)*100
             fig_dd = go.Figure()
             fig_dd.add_trace(go.Scatter(
-                x=drawdown.index,
-                y=drawdown.values,
-                mode='lines+text',
-                name='Drawdown (%)',
-                line=dict(color='crimson'),
-                text=[f"{val:.1f}%" if i == len(drawdown.values) - 1 else "" for i, val in enumerate(drawdown.values)],
-                textposition="bottom right"
+                x=drawdown.index, y=drawdown,
+                mode='lines', name='Drawdown (%)',
+                line=dict(color='crimson')
             ))
-
             fig_dd.update_layout(
-                title="Drawdown del Precio de la Acción",
-                xaxis_title='Fecha',
                 yaxis_title='Drawdown (%)',
-                yaxis=dict(range=[drawdown.min() - 5, 5]),
-                height=450,
-                margin=dict(l=30, r=30, t=60, b=30)
+                yaxis=dict(range=[drawdown.min()-5, 5]),
+                height=450, margin=dict(l=30,r=30,t=60,b=30)
             )
             st.plotly_chart(fig_dd, use_container_width=True)
         except Exception as e:
             st.warning(f"No se pudo calcular el drawdown: {e}")
+
+
         # ==========================
         # BLOQUE 2: Valoración por Dividendo
         # ==========================
         st.subheader(f"🧐 Análisis y Valoración para {ticker_input}")
 
         with st.expander(f"💸 Análisis y Valoración por Dividendo de {ticker_input}"):
+            # ---------- 2-A  Histórico anual de dividendos + CAGR ----------
             dividends = ticker_data.dividends
             if not dividends.empty:
-                annual_dividends = dividends.resample('Y').sum()
+                annual_dividends = (dividends.resample('Y').sum()      # serie
+                                        .astype(float)              # aseguramos numérico
+                                        .dropna())
                 annual_dividends.index = annual_dividends.index.year
-                start_year = pd.to_datetime(price_data.index[0]).year
-                end_year = pd.to_datetime(price_data.index[-1]).year
-                annual_dividends = annual_dividends[(annual_dividends.index >= start_year) & (annual_dividends.index <= end_year)]
+
+                start_year, end_year = price_data.index[[0, -1]].year
+                annual_dividends = annual_dividends.loc[start_year:end_year]
+
                 if len(annual_dividends) >= 3:
-                    first_value = annual_dividends.iloc[0]
-                    penultimate_value = annual_dividends.iloc[-2]
+                    first, penultimate = annual_dividends.iloc[[0, -2]]
                     n_years = annual_dividends.index[-2] - annual_dividends.index[0]
-                    cagr = ((penultimate_value / first_value) ** (1 / n_years) - 1) * 100
-                    cagr_text = f"📌 CAGR del dividendo: {cagr:.2f}% anual ({annual_dividends.index[0]}–{annual_dividends.index[-2]})"
+                    cagr = ((penultimate / first) ** (1 / n_years) - 1) * 100
+                    cagr_text = f"📌 CAGR {cagr:.2f}% anual ({annual_dividends.index[0]}–{annual_dividends.index[-2]})"
                 else:
-                    cagr_text = "📌 CAGR del dividendo: No disponible (datos insuficientes)"
+                    cagr_text = "📌 CAGR no disponible (datos insuf.)"
+
                 fig_div = go.Figure()
                 fig_div.add_trace(go.Bar(
                     x=annual_dividends.index,
                     y=annual_dividends.values,
                     name='Dividendo Anual ($)',
                     marker_color=primary_orange,
-                    text=[f"${val:.2f}" for val in annual_dividends.values],
+                    text=[f"${v:.2f}" for v in annual_dividends.values],
                     textposition='outside'
                 ))
                 fig_div.update_layout(
-                    title=cagr_text,
-                    xaxis_title='Año',
-                    yaxis_title='Dividendo ($)',
-                    height=450,
-                    margin=dict(l=30, r=30, t=60, b=30)
+                    title=cagr_text, xaxis_title='Año', yaxis_title='Dividendo ($)',
+                    height=450, margin=dict(l=30, r=30, t=60, b=30)
                 )
                 st.plotly_chart(fig_div, use_container_width=True, key="plotly_chart_div")
-                st.markdown("#### Resumen de Dividendos por Año")
-                table_df = pd.DataFrame({ year: f"${annual_dividends.loc[year]:.2f}" for year in annual_dividends.index },
-                                        index=["Dividendo ($)"])
-                st.table(table_df)
 
-            st.subheader("#")
-            st.subheader(f"♻️ Sostenibilidad del Dividendo")
+                st.markdown("#### Resumen de Dividendos por Año")
+                st.table(pd.DataFrame(
+                    {y: f"${annual_dividends.loc[y]:.2f}" for y in annual_dividends.index},
+                    index=["Dividendo ($)"]
+                ))
+
+            # ---------- 2-B  Sostenibilidad del dividendo ----------
+            st.subheader("♻️ Sostenibilidad del Dividendo")
             try:
                 cashflow = ticker_data.cashflow.transpose()
                 cashflow.index = cashflow.index.year
-                fcf_col = "Free Cash Flow"
-                dividends_col = "Cash Dividends Paid"
-                if fcf_col in cashflow.columns and dividends_col in cashflow.columns:
-                    fcf = cashflow[fcf_col]
-                    dividends_paid = cashflow[dividends_col]
-                    df_fcf = pd.DataFrame({
-                        'FCF': fcf,
-                        'Dividendos Pagados': dividends_paid.abs()
-                    }).dropna()
-                    df_fcf['FCF Payout (%)'] = (df_fcf['Dividendos Pagados'] / df_fcf['FCF']) * 100
+
+                fcf_col, dividends_col = "Free Cash Flow", "Cash Dividends Paid"
+                if fcf_col in cashflow and dividends_col in cashflow:
+                    fcf            = pd.to_numeric(cashflow[fcf_col],         errors="coerce")
+                    dividends_paid = pd.to_numeric(cashflow[dividends_col],   errors="coerce")
+
+                    df_fcf = (pd.DataFrame({
+                                "FCF": fcf,
+                                "Dividendos Pagados": dividends_paid.abs()
+                            })
+                            .dropna())
+                    df_fcf["FCF Payout (%)"] = (df_fcf["Dividendos Pagados"] / df_fcf["FCF"]) * 100
+
                     fig_sost = go.Figure()
-                    fig_sost.add_trace(go.Bar(
-                        x=df_fcf.index,
-                        y=df_fcf['FCF'],
-                        name='FCF',
-                        marker_color=primary_orange,
-                        text=df_fcf['FCF'].round(0),
-                        textposition='outside'
-                    ))
-                    fig_sost.add_trace(go.Bar(
-                        x=df_fcf.index,
-                        y=df_fcf['Dividendos Pagados'],
-                        name='Dividendos Pagados',
-                        marker_color=primary_blue,
-                        text=df_fcf['Dividendos Pagados'].round(0),
-                        textposition='outside'
-                    ))
-                    fig_sost.add_trace(go.Scatter(
-                        x=df_fcf.index,
-                        y=df_fcf['FCF Payout (%)'],
-                        name='FCF Payout (%)',
-                        mode='lines+markers+text',
-                        yaxis='y2',
-                        line=dict(color=primary_pink),
-                        text=[f"{val:.0f}%" for val in df_fcf['FCF Payout (%)']],
-                        textposition='top right'
-                    ))
+                    fig_sost.add_trace(go.Bar(x=df_fcf.index, y=df_fcf["FCF"],
+                                            name="FCF", marker_color=primary_orange,
+                                            text=df_fcf["FCF"].round(0), textposition="outside"))
+                    fig_sost.add_trace(go.Bar(x=df_fcf.index, y=df_fcf["Dividendos Pagados"],
+                                            name="Dividendos Pagados", marker_color=primary_blue,
+                                            text=df_fcf["Dividendos Pagados"].round(0), textposition="outside"))
+                    fig_sost.add_trace(go.Scatter(x=df_fcf.index, y=df_fcf["FCF Payout (%)"],
+                                                name="FCF Payout (%)", mode="lines+markers+text",
+                                                yaxis="y2", line=dict(color=primary_pink),
+                                                text=[f"{v:.0f}%" for v in df_fcf["FCF Payout (%)"]],
+                                                textposition="top right"))
                     fig_sost.update_layout(
                         title="FCF vs Dividendos Pagados y FCF Payout Ratio",
-                        xaxis_title="Año",
-                        yaxis_title="Millones USD",
-                        yaxis2=dict(
-                            title='FCF Payout (%)',
-                            overlaying='y',
-                            side='right'
-                        ),
-                        barmode='group',
-                        height=500,
-                        margin=dict(l=30, r=30, t=60, b=30)
+                        xaxis_title="Año", yaxis_title="Millones USD",
+                        yaxis2=dict(title="FCF Payout (%)", overlaying="y", side="right"),
+                        barmode="group", height=500, margin=dict(l=30, r=30, t=60, b=30)
                     )
                     st.plotly_chart(fig_sost, use_container_width=True, key="plotly_chart_sost")
                 else:
-                    st.warning("No se encontraron las columnas necesarias para calcular el FCF o los Dividendos.")
+                    st.warning("No se encontraron columnas de FCF o Dividendos en el cash-flow.")
             except Exception as e:
                 st.warning(f"No se pudo generar el gráfico de sostenibilidad: {e}")
 
-            st.subheader(f"📉 Rentabilidad por Dividendo Histórica")
+            # ---------- 2-C  Rentabilidad histórica ----------
+            st.subheader("📉 Rentabilidad por Dividendo Histórica")
             try:
-                df_yield = price_data[['Close']].copy()
-                df_yield['Año'] = df_yield.index.year
-                dividend_map = annual_dividends.to_dict()
-                df_yield['Dividendo Anual'] = df_yield['Año'].map(dividend_map)
-                df_yield['Yield (%)'] = (df_yield['Dividendo Anual'] / df_yield['Close']) * 100
+                df_yield = price_data[["Close"]].copy()
+                df_yield["Año"] = df_yield.index.year
+                dividend_map = annual_dividends.to_dict() if not dividends.empty else {}
+                df_yield["Dividendo Anual"] = (df_yield["Año"].map(dividend_map)
+                                                            .astype(float))
+                df_yield["Yield (%)"] = (df_yield["Dividendo Anual"] / df_yield["Close"]) * 100
                 if len(annual_dividends) > 1:
                     max_full_year = annual_dividends.index[-2]
-                    df_yield = df_yield[df_yield['Año'] <= max_full_year]
-                avg_yield_div = df_yield['Yield (%)'].mean()
-                max_yield_div = df_yield['Yield (%)'].max()
-                min_yield_div = df_yield['Yield (%)'].min()
+                    df_yield = df_yield[df_yield["Año"] <= max_full_year]
+
+                avg_yield_div = df_yield["Yield (%)"].mean()
+                max_yield_div = df_yield["Yield (%)"].max()
+                min_yield_div = df_yield["Yield (%)"].min()
+
                 fig_yield = go.Figure()
                 fig_yield.add_trace(go.Scatter(
-                    x=df_yield.index,
-                    y=df_yield['Yield (%)'],
-                    mode='lines',
-                    name='Yield Diario',
+                    x=df_yield.index, y=df_yield["Yield (%)"],
+                    mode="lines", name="Yield Diario",
                     line=dict(color=primary_pink)
                 ))
-                fig_yield.add_hline(y=avg_yield_div, line=dict(dash='dash', color='gray'),
-                                    annotation_text='Promedio', annotation_position='top left')
-                fig_yield.add_hline(y=max_yield_div, line=dict(dash='dot', color='green'),
-                                    annotation_text='Máximo', annotation_position='top left')
-                fig_yield.add_hline(y=min_yield_div, line=dict(dash='dot', color='red'),
-                                    annotation_text='Mínimo', annotation_position='bottom left')
+                fig_yield.add_hline(y=avg_yield_div, line=dict(dash="dash"),
+                                    annotation_text="Promedio")
+                fig_yield.add_hline(y=max_yield_div, line=dict(dash="dot"),
+                                    annotation_text="Máximo")
+                fig_yield.add_hline(y=min_yield_div, line=dict(dash="dot"),
+                                    annotation_text="Mínimo")
                 fig_yield.update_layout(
-                    title="Rentabilidad por Dividendo (Diaria, filtrada)",
-                    xaxis_title='Fecha',
-                    yaxis_title='Yield (%)',
-                    height=450,
-                    margin=dict(l=30, r=30, t=60, b=30)
+                    title="Rentabilidad por Dividendo (filtrada)",
+                    xaxis_title="Fecha", yaxis_title="Yield (%)",
+                    height=450, margin=dict(l=30,r=30,t=60,b=30)
                 )
                 st.plotly_chart(fig_yield, use_container_width=True, key="plotly_chart_yield")
             except Exception as e:
-                st.warning(f"No se pudo generar el gráfico de yield diario: {e}")
-            
+                st.warning(f"No se pudo generar el gráfico de yield: {e}")
+
+            # ---------- 2-D  Método Geraldine Weiss ----------
             st.subheader(f"💎 Método Geraldine Weiss: Datos, Resumen y Gráfico")
             try:
                 dividends = ticker_data.dividends
@@ -602,916 +552,676 @@ with tabs[0]:
                     st.dataframe(df_tabla)
             except Exception as e:
                 st.error(f"No se pudo generar el gráfico del Método Geraldine Weiss: {e}")
+            # ……………………… (toda tu lógica actual sin cambios) ………………………
+
 
         # ==========================
         # BLOQUE 3: Valoración por Múltiplos
         # ==========================
         with st.expander(f"💱 Análisis y Valoración por Múltiplos de {ticker_input}"):
-            st.subheader(f"💵 Evolución de la Deuda")
+
+            # ---------- 3-A  Evolución de la Deuda ----------
+            st.subheader("💵 Evolución de la Deuda")
             try:
-                bs = ticker_data.balance_sheet.transpose()
+                # Balance y Cash-Flow convertidos a float
+                bs = (ticker_data.balance_sheet.transpose()
+                                    .apply(pd.to_numeric, errors="coerce"))
                 bs.index = bs.index.year
 
-                if "Total Debt" in bs.columns:
-                    total_debt = bs["Total Debt"]
-                elif "Long Term Debt" in bs.columns:
-                    total_debt = bs["Long Term Debt"]
-                else:
-                    total_debt = None
-
-                if "Cash And Cash Equivalents" in bs.columns:
-                    cash = bs["Cash And Cash Equivalents"]
-                elif "Cash" in bs.columns:
-                    cash = bs["Cash"]
-                else:
-                    cash = None
-
-                if total_debt is not None and cash is not None:
-                    net_debt = total_debt - cash
-                else:
-                    net_debt = None
-
-                cf = ticker_data.cashflow.transpose()
+                cf = (ticker_data.cashflow.transpose()
+                                    .apply(pd.to_numeric, errors="coerce"))
                 cf.index = cf.index.year
-                if "Free Cash Flow" in cf.columns:
-                    fcf = cf["Free Cash Flow"]
-                else:
-                    fcf = None
 
-                if net_debt is not None and fcf is not None:
-                    debt_to_fcf = net_debt / fcf
-                else:
-                    debt_to_fcf = None
+                total_debt = bs.get("Total Debt")          or bs.get("Long Term Debt")
+                cash       = bs.get("Cash And Cash Equivalents") or bs.get("Cash")
+                fcf        = cf.get("Free Cash Flow")
 
-                df_deuda = pd.DataFrame()
-                if fcf is not None:
-                    df_deuda['FCF'] = fcf
-                if net_debt is not None:
-                    df_deuda['Deuda Neta'] = net_debt
-                if debt_to_fcf is not None:
-                    df_deuda['Deuda Neta/FCF'] = debt_to_fcf
+                df_deuda = pd.DataFrame({
+                    "FCF":          fcf,
+                    "Deuda Neta":   (total_debt - cash) if total_debt is not None and cash is not None else None
+                }).dropna(how="all")
+
+                if not df_deuda.empty and "FCF" in df_deuda and "Deuda Neta" in df_deuda:
+                    df_deuda["Deuda Neta/FCF"] = df_deuda["Deuda Neta"] / df_deuda["FCF"]
+                    df_deuda = df_deuda.replace([np.inf, -np.inf], np.nan).dropna()
 
                 fig_deuda = go.Figure()
-                if 'FCF' in df_deuda.columns:
+                if "FCF" in df_deuda.columns:
                     fig_deuda.add_trace(go.Bar(
-                        x=df_deuda.index,
-                        y=df_deuda['FCF'],
-                        name='FCF',
-                        marker_color=primary_orange,
-                        text=df_deuda['FCF'].round(0),
-                        textposition='outside'
+                        x=df_deuda.index, y=df_deuda["FCF"],
+                        name="FCF", marker_color=primary_orange,
+                        text=df_deuda["FCF"].round(0), textposition="outside"
                     ))
-                if 'Deuda Neta' in df_deuda.columns:
+                if "Deuda Neta" in df_deuda.columns:
                     fig_deuda.add_trace(go.Bar(
-                        x=df_deuda.index,
-                        y=df_deuda['Deuda Neta'],
-                        name='Deuda Neta',
-                        marker_color=primary_blue,
-                        text=df_deuda['Deuda Neta'].round(0),
-                        textposition='outside'
+                        x=df_deuda.index, y=df_deuda["Deuda Neta"],
+                        name="Deuda Neta", marker_color=primary_blue,
+                        text=df_deuda["Deuda Neta"].round(0), textposition="outside"
                     ))
-                if 'Deuda Neta/FCF' in df_deuda.columns:
+                if "Deuda Neta/FCF" in df_deuda.columns:
                     fig_deuda.add_trace(go.Scatter(
-                        x=df_deuda.index,
-                        y=df_deuda['Deuda Neta/FCF'],
-                        name='Deuda Neta/FCF',
-                        mode='lines+markers+text',
-                        yaxis='y2',
-                        line=dict(color=primary_pink),
-                        text=[f"{val:.2f}" for val in df_deuda['Deuda Neta/FCF']],
-                        textposition='top right'
+                        x=df_deuda.index, y=df_deuda["Deuda Neta/FCF"],
+                        name="Deuda Neta/FCF", mode="lines+markers+text",
+                        yaxis="y2", line=dict(color=primary_pink),
+                        text=[f"{v:.2f}" for v in df_deuda["Deuda Neta/FCF"]],
+                        textposition="top right"
                     ))
 
                 fig_deuda.update_layout(
                     title="Evolución de Deuda, FCF y Deuda Neta/FCF",
-                    xaxis_title="Año",
-                    yaxis_title="Valor (Millones USD)",
-                    yaxis2=dict(
-                        title='Deuda Neta/FCF',
-                        overlaying='y',
-                        side='right'
-                    ),
-                    barmode='group',
-                    height=500,
+                    xaxis_title="Año", yaxis_title="Millones USD",
+                    yaxis2=dict(title="Deuda Neta/FCF", overlaying="y", side="right"),
+                    barmode="group", height=500,
                     margin=dict(l=30, r=30, t=60, b=30)
                 )
-
                 st.plotly_chart(fig_deuda, use_container_width=True, key="plotly_chart_deuda")
             except Exception as e:
                 st.warning(f"No se pudo generar el gráfico de deuda: {e}")
 
-            st.subheader(f"📈 Histórico del PER, EPS y Precio")
+            # ---------- 3-B  Histórico PER ----------
+            st.subheader("📈 Histórico del PER, EPS y Precio")
             try:
                 st.subheader(f"📌 El PER actual es de {pe_ratio:.2f}x")
                 income_statement = ticker_data.financials
+
                 if "Basic EPS" not in income_statement.index:
-                    st.warning("No se encontró 'Basic EPS' en el Income Statement para calcular el PER.")
+                    st.warning("No se encontró 'Basic EPS'.")
                 else:
-                    eps_series = income_statement.loc["Basic EPS"]
+                    eps_series = pd.to_numeric(income_statement.loc["Basic EPS"], errors="coerce")
                     eps_series.index = pd.to_datetime(eps_series.index).year
-                    eps_series = eps_series.sort_index()
-                    price_yearly = price_data.resample('Y').last()['Close']
+                    price_yearly = pd.to_numeric(
+                        price_data.resample("Y").last()["Close"], errors="coerce")
                     price_yearly.index = price_yearly.index.year
-                    price_yearly = price_yearly.sort_index()
-                    common_years = eps_series.index.intersection(price_yearly.index)
-                    eps_series = eps_series.loc[common_years]
-                    price_yearly = price_yearly.loc[common_years]
-                    per_series = price_yearly / eps_series
-                    per_series = per_series.replace([float('inf'), -float('inf')], None).dropna()
-                    df_per = pd.DataFrame({
-                        "EPS": eps_series,
-                        "Precio": price_yearly,
-                        "PER": per_series
-                    })
+
+                    df_per = (pd.DataFrame({
+                                "EPS": eps_series, "Precio": price_yearly
+                            })
+                            .dropna())
+                    df_per["PER"] = df_per["Precio"] / df_per["EPS"]
+                    df_per = df_per.replace([np.inf, -np.inf], np.nan).dropna()
+
                     fig_combined = go.Figure()
                     fig_combined.add_trace(go.Bar(
-                        x=df_per.index,
-                        y=df_per["EPS"],
-                        name="EPS",
-                        marker_color=primary_orange,
-                        text=df_per["EPS"].round(2),
-                        textposition='outside'
-                    ))
+                        x=df_per.index, y=df_per["EPS"],
+                        name="EPS", marker_color=primary_orange,
+                        text=df_per["EPS"].round(2), textposition="outside"))
                     fig_combined.add_trace(go.Bar(
-                        x=df_per.index,
-                        y=df_per["Precio"],
-                        name="Precio",
-                        marker_color=primary_blue,
-                        text=df_per["Precio"].round(2),
-                        textposition='outside'
-                    ))
+                        x=df_per.index, y=df_per["Precio"],
+                        name="Precio", marker_color=primary_blue,
+                        text=df_per["Precio"].round(2), textposition="outside"))
                     fig_combined.add_trace(go.Scatter(
-                        x=df_per.index,
-                        y=df_per["PER"],
-                        name="PER",
-                        mode="lines+markers+text",
-                        yaxis="y2",
-                        line=dict(color=primary_pink),
-                        text=[f"{val:.2f}" for val in df_per["PER"]],
-                        textposition='top right'
-                    ))
+                        x=df_per.index, y=df_per["PER"],
+                        name="PER", mode="lines+markers+text",
+                        yaxis="y2", line=dict(color=primary_pink),
+                        text=[f"{v:.2f}" for v in df_per["PER"]],
+                        textposition="top right"))
                     fig_combined.update_layout(
                         title="Histórico del EPS, Precio y PER",
                         xaxis_title="Año",
                         yaxis=dict(title="EPS / Precio"),
                         yaxis2=dict(title="PER", overlaying="y", side="right"),
-                        barmode="group",
-                        height=450,
-                        margin=dict(l=30, r=30, t=60, b=30)
-                    )
+                        barmode="group", height=450,
+                        margin=dict(l=30, r=30, t=60, b=30))
                     st.plotly_chart(fig_combined, use_container_width=True, key="plotly_chart_per")
             except Exception as e:
-                st.warning(f"No se pudo generar el gráfico combinado del PER: {e}")
-            
-            st.subheader(f"📐 Evolución de EV, EBITDA y EV/EBITDA")
+                st.warning(f"No se pudo generar el gráfico PER: {e}")
+
+            # ---------- 3-C  EV / EBITDA ----------
+            st.subheader("📐 Evolución de EV, EBITDA y EV/EBITDA")
             try:
-                # Obtener EBITDA a partir del Income Statement
-                income = ticker_data.financials.transpose()
+                income = (ticker_data.financials.transpose()
+                                        .apply(pd.to_numeric, errors="coerce"))
                 income.index = income.index.year
-                income = income.apply(pd.to_numeric, errors="coerce")
-                if "EBITDA" in income.columns:
-                    ebitda = income["EBITDA"]
-                else:
-                    ebitda = None
+                ebitda = income.get("EBITDA")
 
-                # Obtener deuda total y caja a partir del Balance
-                bs = ticker_data.balance_sheet.transpose()
+                bs = (ticker_data.balance_sheet.transpose()
+                                    .apply(pd.to_numeric, errors="coerce"))
                 bs.index = bs.index.year
-                if "Total Debt" in bs.columns:
-                    total_debt = bs["Total Debt"]
-                elif "Long Term Debt" in bs.columns:
-                    total_debt = bs["Long Term Debt"]
-                else:
-                    total_debt = None
+                total_debt = bs.get("Total Debt") or bs.get("Long Term Debt")
+                cash       = bs.get("Cash And Cash Equivalents") or bs.get("Cash")
+                net_debt   = total_debt - cash if total_debt is not None and cash is not None else None
 
-                if "Cash And Cash Equivalents" in bs.columns:
-                    cash = bs["Cash And Cash Equivalents"]
-                elif "Cash" in bs.columns:
-                    cash = bs["Cash"]
-                else:
-                    cash = None
+                market_cap = ticker_data.info.get("marketCap")
 
-                # Calcular la deuda neta (serie completa)
-                if total_debt is not None and cash is not None:
-                    net_debt_series = total_debt - cash
-                else:
-                    net_debt_series = None
-
-                market_cap = ticker_data.info.get("marketCap", None)
-
-                # Calcular el EV/EBITDA "actual" usando el último año disponible
-                if ebitda is not None and net_debt_series is not None and market_cap is not None:
-                    last_year = bs.index.max()
-                    try:
-                        last_debt = total_debt.loc[last_year]
-                        last_cash = cash.loc[last_year]
-                        net_debt_current = last_debt - last_cash
-                        ev_current = market_cap + net_debt_current
-                        last_ebitda = ebitda.loc[last_year]
-                        current_ev_ebitda = ev_current / last_ebitda if last_ebitda != 0 else None
-                    except Exception as ex:
-                        current_ev_ebitda = None
-                else:
-                    current_ev_ebitda = None
-
-                # Mostrar el EV/EBITDA actual (similar a lo que haces con el PER)
-                st.subheader(f"📌 El EV/EBITDA actual es de {current_ev_ebitda:.2f}" if current_ev_ebitda is not None else "EV/EBITDA actual no disponible")
-                
-                # Calcular el ratio EV/EBITDA a partir de la serie completa
-                if total_debt is not None and cash is not None:
-                    net_debt = total_debt - cash
-                else:
-                    net_debt = None
-
-                if market_cap is not None and net_debt is not None:
+                if ebitda is not None and net_debt is not None and market_cap is not None:
                     ev = market_cap + net_debt
-                else:
-                    ev = None
-
-                if ev is not None and ebitda is not None:
                     ev_ebitda = ev / ebitda
                 else:
-                    ev_ebitda = None
+                    ev = ev_ebitda = None
 
-                df_ev = pd.DataFrame()
-                if ebitda is not None:
-                    df_ev["EBITDA"] = ebitda
-                if ev is not None:
-                    df_ev["EV"] = ev
-                if ev_ebitda is not None:
-                    df_ev["EV/EBITDA"] = ev_ebitda
+                df_ev = pd.DataFrame({
+                    "EBITDA": ebitda,
+                    "EV": ev,
+                    "EV/EBITDA": ev_ebitda
+                }).dropna(how="all")
+
+                # EV/EBITDA actual (último año)
+                current_ev_ebitda = df_ev["EV/EBITDA"].dropna().iloc[-1] if "EV/EBITDA" in df_ev and not df_ev["EV/EBITDA"].dropna().empty else None
+                st.subheader(f"📌 EV/EBITDA actual: {current_ev_ebitda:.2f}" if current_ev_ebitda is not None else "EV/EBITDA actual no disponible")
 
                 fig_ev = go.Figure()
-                if "EBITDA" in df_ev.columns:
+                if "EBITDA" in df_ev:
                     fig_ev.add_trace(go.Bar(
-                        x=df_ev.index,
-                        y=df_ev["EBITDA"],
-                        name="EBITDA",
-                        marker_color=primary_orange,
-                        text=df_ev["EBITDA"].round(0),
-                        textposition='outside'
-                    ))
-                if "EV" in df_ev.columns:
+                        x=df_ev.index, y=df_ev["EBITDA"],
+                        name="EBITDA", marker_color=primary_orange,
+                        text=df_ev["EBITDA"].round(0), textposition="outside"))
+                if "EV" in df_ev:
                     fig_ev.add_trace(go.Bar(
-                        x=df_ev.index,
-                        y=df_ev["EV"],
-                        name="EV",
-                        marker_color=primary_blue,
-                        text=df_ev["EV"].round(0),
-                        textposition='outside'
-                    ))
-                if "EV/EBITDA" in df_ev.columns:
+                        x=df_ev.index, y=df_ev["EV"],
+                        name="EV", marker_color=primary_blue,
+                        text=df_ev["EV"].round(0), textposition="outside"))
+                if "EV/EBITDA" in df_ev:
                     fig_ev.add_trace(go.Scatter(
-                        x=df_ev.index,
-                        y=df_ev["EV/EBITDA"],
-                        name="EV/EBITDA",
-                        mode="lines+markers+text",
-                        yaxis="y2",
-                        line=dict(color=primary_pink),
-                        text=[f"{val:.2f}" for val in df_ev["EV/EBITDA"]],
-                        textposition='top right'
-                    ))
+                        x=df_ev.index, y=df_ev["EV/EBITDA"],
+                        name="EV/EBITDA", mode="lines+markers+text",
+                        yaxis="y2", line=dict(color=primary_pink),
+                        text=[f"{v:.2f}" for v in df_ev["EV/EBITDA"]],
+                        textposition="top right"))
                 fig_ev.update_layout(
                     title="Evolución de EV, EBITDA y EV/EBITDA",
-                    xaxis_title="Año",
-                    yaxis_title="Valor (USD)",
+                    xaxis_title="Año", yaxis_title="Valor (USD)",
                     yaxis2=dict(title="EV/EBITDA", overlaying="y", side="right"),
-                    barmode="group",
-                    height=500,
-                    margin=dict(l=30, r=30, t=60, b=30)
-                )
+                    barmode="group", height=500,
+                    margin=dict(l=30, r=30, t=60, b=30))
                 st.plotly_chart(fig_ev, use_container_width=True, key="plotly_chart_ev")
             except Exception as e:
-                st.warning(f"No se pudo generar el gráfico de EV y EBITDA: {e}")
-
+                st.warning(f"No se pudo generar el gráfico EV/EBITDA: {e}")
 
         # ==========================
         # BLOQUE 4: Análisis Fundamental - Balance
         # ==========================
         with st.expander(f"⚖️ Análisis Fundamental - Balance de {ticker_input}"):
+
+            # ------------------------------------------------------------------
+            # 4-A  Activos totales vs corrientes
+            # ------------------------------------------------------------------
             st.subheader("🏢 Evolución de Activos Totales y Activos Corrientes")
             try:
-                bs_t = ticker_data.balance_sheet.transpose()
+                bs_t = (ticker_data.balance_sheet.transpose()
+                                        .apply(pd.to_numeric, errors="coerce")
+                                        .dropna(how="all"))
                 bs_t.index = bs_t.index.year
+
                 if "Total Assets" not in bs_t.columns:
                     st.warning("No se encontró 'Total Assets' en el Balance Sheet.")
                 else:
                     total_assets = bs_t["Total Assets"]
-                    possible_current_assets = ["Current Assets", "Total Current Assets"]
-                    found_current_assets = None
-                    for key in possible_current_assets:
-                        if key in bs_t.columns:
-                            found_current_assets = key
-                            break
+                    found_current_assets = next(
+                        (c for c in ["Current Assets", "Total Current Assets"] if c in bs_t.columns),
+                        None)
+
                     if found_current_assets is None:
                         st.warning("No se encontró información sobre Activos Corrientes.")
                     else:
                         current_assets = bs_t[found_current_assets]
-                        df_activos = pd.DataFrame({
+
+                        df_activos = (pd.DataFrame({
                             "Total Assets": total_assets,
                             found_current_assets: current_assets
                         })
+                        .replace([np.inf, -np.inf], np.nan)
+                        .dropna(how="all"))
+
                         fig_activos = go.Figure()
-                        fig_activos.add_trace(go.Bar(
-                            x=bs_t.index,
-                            y=total_assets,
-                            name="Total Assets",
-                            marker_color=primary_blue,
-                            text=[f"${val:,.0f}" for val in total_assets],
-                            textposition='outside'
-                        ))
-                        fig_activos.add_trace(go.Bar(
-                            x=bs_t.index,
-                            y=current_assets,
-                            name=found_current_assets,
-                            marker_color=primary_orange,
-                            text=[f"${val:,.0f}" for val in current_assets],
-                            textposition='outside'
-                        ))
+                        if not df_activos["Total Assets"].dropna().empty:
+                            fig_activos.add_trace(go.Bar(
+                                x=df_activos.index,
+                                y=df_activos["Total Assets"],
+                                name="Total Assets",
+                                marker_color=primary_blue,
+                                text=df_activos["Total Assets"].round(0),
+                                textposition="outside"))
+                        if not df_activos[found_current_assets].dropna().empty:
+                            fig_activos.add_trace(go.Bar(
+                                x=df_activos.index,
+                                y=df_activos[found_current_assets],
+                                name=found_current_assets,
+                                marker_color=primary_orange,
+                                text=df_activos[found_current_assets].round(0),
+                                textposition="outside"))
+
                         fig_activos.update_layout(
                             title="Evolución de Activos Totales y Activos Corrientes",
-                            xaxis_title="Año",
-                            yaxis_title="Valor (USD)",
-                            barmode="group",
-                            height=450,
-                            margin=dict(l=30, r=30, t=60, b=30)
-                        )
+                            xaxis_title="Año", yaxis_title="Valor (USD)",
+                            barmode="group", height=450,
+                            margin=dict(l=30, r=30, t=60, b=30))
                         st.plotly_chart(fig_activos, use_container_width=True, key="plotly_chart_activos")
                         st.markdown("#### Datos de Activos")
                         st.dataframe(df_activos)
             except Exception as e:
                 st.warning(f"No se pudo generar el gráfico de activos: {e}")
-            
-            #-------------------------------------------
-            #Pasivos
-            #-------------------------------------------
 
-            # ──────────────────────────────────────────────────────────────
-            # 💳  Evolución de Pasivos Totales y Pasivos Corrientes
-            #     +  Deuda Total vs Deuda Neta
-            # ──────────────────────────────────────────────────────────────
+            # ------------------------------------------------------------------
+            # 4-B  Pasivos totales / corrientes + Deuda
+            # ------------------------------------------------------------------
             st.subheader("💳 Evolución de Pasivos Totales y Pasivos Corrientes Totales")
             try:
-                bs_t = ticker_data.balance_sheet.transpose()
+                bs_t = (ticker_data.balance_sheet.transpose()
+                                        .apply(pd.to_numeric, errors="coerce")
+                                        .dropna(how="all"))
                 bs_t.index = bs_t.index.year
 
-                # ---------- Pasivos totales / corrientes -------------------
                 if "Total Liabilities Net Minority Interest" not in bs_t.columns:
-                    st.warning("No se encontró 'Total Liabilities Net Minority Interest' en el Balance Sheet.")
+                    st.warning("No se encontró 'Total Liabilities Net Minority Interest'.")
                 else:
                     total_liabilities = bs_t["Total Liabilities Net Minority Interest"]
-
-                    # intento de 2 posibles nombres para pasivo corriente
-                    possible_current = ["Current Liabilities", "Total Current Liabilities"]
-                    found_current = next((c for c in possible_current if c in bs_t.columns), None)
+                    found_current = next((c for c in
+                                        ["Current Liabilities", "Total Current Liabilities"]
+                                        if c in bs_t.columns), None)
 
                     if found_current is None:
-                        st.warning("No se encontró información sobre Pasivos Corrientes Totales.")
+                        st.warning("No se encontró información sobre Pasivos Corrientes.")
                     else:
                         current_liabilities = bs_t[found_current]
 
-                        df_pasivos = pd.DataFrame({
+                        df_pasivos = (pd.DataFrame({
                             "Total Liabilities": total_liabilities,
                             found_current: current_liabilities
                         })
+                        .replace([np.inf, -np.inf], np.nan)
+                        .dropna(how="all"))
 
                         fig_pasivos = go.Figure()
                         fig_pasivos.add_trace(go.Bar(
                             x=df_pasivos.index, y=df_pasivos["Total Liabilities"],
                             name="Total Liabilities", marker_color=primary_blue,
-                            text=[f"${v:,.0f}" for v in df_pasivos["Total Liabilities"]],
-                            textposition="outside"
-                        ))
+                            text=df_pasivos["Total Liabilities"].round(0),
+                            textposition="outside"))
                         fig_pasivos.add_trace(go.Bar(
                             x=df_pasivos.index, y=df_pasivos[found_current],
                             name=found_current, marker_color=primary_orange,
-                            text=[f"${v:,.0f}" for v in df_pasivos[found_current]],
-                            textposition="outside"
-                        ))
+                            text=df_pasivos[found_current].round(0),
+                            textposition="outside"))
 
                         fig_pasivos.update_layout(
                             title="Evolución de Pasivos Totales y Pasivos Corrientes Totales",
                             xaxis_title="Año", yaxis_title="Valor (USD)",
                             barmode="group", height=450,
-                            margin=dict(l=30, r=30, t=60, b=30)
-                        )
+                            margin=dict(l=30, r=30, t=60, b=30))
                         st.plotly_chart(fig_pasivos, use_container_width=True, key="plotly_pasivos")
                         st.markdown("#### Datos de Pasivos")
                         st.dataframe(df_pasivos)
 
-                # ---------- Deuda Total vs Deuda Neta -----------------------
+                # ---------- Deuda total vs neta ----------
                 st.subheader("💰 Evolución de Deuda Total vs Deuda Neta")
-                debt_cols = [c for c in ["Total Debt", "Net Debt"] if c in bs_t.columns]
-                if len(debt_cols) < 2:
-                    st.warning("No se encontraron ambos campos 'Total Debt' y 'Net Debt' en el Balance.")
+                total_debt = bs_t.get("Total Debt")
+                net_debt   = bs_t.get("Net Debt")
+                if total_debt is None or net_debt is None:
+                    st.warning("No se encontraron ambos campos 'Total Debt' y 'Net Debt'.")
                 else:
-                    total_debt = bs_t["Total Debt"]
-                    net_debt   = bs_t["Net Debt"]
-
-                    df_debt = pd.DataFrame({
-                        "Total Debt": total_debt,
-                        "Net Debt":   net_debt
-                    })
+                    df_debt = (pd.DataFrame({"Total Debt": total_debt, "Net Debt": net_debt})
+                                .replace([np.inf, -np.inf], np.nan)
+                                .dropna(how="all"))
 
                     fig_debt = go.Figure()
                     fig_debt.add_trace(go.Bar(
                         x=df_debt.index, y=df_debt["Total Debt"],
                         name="Total Debt", marker_color=primary_blue,
-                        text=[f"${v:,.0f}" for v in df_debt["Total Debt"]],
-                        textposition="outside"
-                    ))
+                        text=df_debt["Total Debt"].round(0), textposition="outside"))
                     fig_debt.add_trace(go.Bar(
                         x=df_debt.index, y=df_debt["Net Debt"],
                         name="Net Debt", marker_color=primary_pink,
-                        text=[f"${v:,.0f}" for v in df_debt["Net Debt"]],
-                        textposition="outside"
-                    ))
-
+                        text=df_debt["Net Debt"].round(0), textposition="outside"))
                     fig_debt.update_layout(
                         title="Evolución de Deuda Total y Deuda Neta",
                         xaxis_title="Año", yaxis_title="Valor (USD)",
                         barmode="group", height=450,
-                        margin=dict(l=30, r=30, t=60, b=30)
-                    )
+                        margin=dict(l=30, r=30, t=60, b=30))
                     st.plotly_chart(fig_debt, use_container_width=True, key="plotly_debt")
                     st.markdown("#### Datos de Deuda")
                     st.dataframe(df_debt)
-
             except Exception as e:
                 st.warning(f"No se pudo generar los gráficos de pasivos/deuda: {e}")
 
-            #-------------------------------------------
-            #Patrimonio
-            #-------------------------------------------
-
+            # ------------------------------------------------------------------
+            # 4-C  Patrimonio
+            # ------------------------------------------------------------------
             st.subheader("💼 Evolución del Patrimonio")
             try:
-                bs_t = ticker_data.balance_sheet.transpose()
+                bs_t = (ticker_data.balance_sheet.transpose()
+                                        .apply(pd.to_numeric, errors="coerce"))
                 bs_t.index = bs_t.index.year
-                if "Total Equity Gross Minority Interest" not in bs_t.columns:
-                    st.warning("No se encontró 'Total Equity Gross Minority Interest' en el Balance Sheet.")
+
+                total_equity = bs_t.get("Total Equity Gross Minority Interest")
+                if total_equity is None:
+                    st.warning("No se encontró 'Total Equity Gross Minority Interest'.")
                 else:
-                    total_equity = bs_t["Total Equity Gross Minority Interest"]
-                    df_capital = pd.DataFrame({"Total Equity": total_equity})
+                    df_capital = total_equity.to_frame("Total Equity")
                     fig_capital = go.Figure()
                     fig_capital.add_trace(go.Bar(
-                        x=total_equity.index,
-                        y=total_equity.values,
-                        name="Total Equity Gross Minority Interest",
-                        marker_color=primary_orange,
-                        text=[f"${val:,.0f}" for val in total_equity.values],
-                        textposition='outside'
-                    ))
+                        x=df_capital.index, y=df_capital["Total Equity"],
+                        name="Total Equity", marker_color=primary_orange,
+                        text=df_capital["Total Equity"].round(0), textposition="outside"))
                     fig_capital.update_layout(
                         title="Evolución del Patrimonio",
-                        xaxis_title="Año",
-                        yaxis_title="Valor (USD)",
-                        height=450,
-                        margin=dict(l=30, r=30, t=60, b=30)
-                    )
-                    st.plotly_chart(fig_capital, use_container_width=True, key="plotly_chart_capital")
+                        xaxis_title="Año", yaxis_title="Valor (USD)",
+                        height=450, margin=dict(l=30, r=30, t=60, b=30))
+                    st.plotly_chart(fig_capital, use_container_width=True,
+                                    key="plotly_chart_capital")
                     st.markdown("#### Datos del Patrimonio")
                     st.dataframe(df_capital)
             except Exception as e:
-                st.warning(f"No se pudo generar el gráfico de evolución del Capital: {e}")
-            
+                st.warning(f"No se pudo generar el gráfico de Patrimonio: {e}")
+
+            # ------------------------------------------------------------------
+            # 4-D  Visión 3-líneas (Assets / Liabilities / Equity)
+            # ------------------------------------------------------------------
             st.subheader("⏳ Evolución del Balance")
             try:
-                bs_t = ticker_data.balance_sheet.transpose()
+                bs_t = (ticker_data.balance_sheet.transpose()
+                                        .apply(pd.to_numeric, errors="coerce"))
                 bs_t.index = bs_t.index.year
-                required_cols = ["Total Assets", "Total Liabilities Net Minority Interest", "Total Equity Gross Minority Interest"]
-                missing = [col for col in required_cols if col not in bs_t.columns]
-                if missing:
-                    st.warning(f"No se encontraron los siguientes datos en el Balance Sheet: {', '.join(missing)}")
+
+                req = ["Total Assets", "Total Liabilities Net Minority Interest",
+                    "Total Equity Gross Minority Interest"]
+                if any(c not in bs_t.columns for c in req):
+                    st.warning("Faltan columnas clave para la vista de balance.")
                 else:
-                    total_assets = bs_t["Total Assets"]
-                    total_liabilities = bs_t["Total Liabilities Net Minority Interest"]
-                    total_equity = bs_t["Total Equity Gross Minority Interest"]
-                    df_balance = pd.DataFrame({
-                        "Total Assets": total_assets,
-                        "Total Liabilities": total_liabilities,
-                        "Total Equity": total_equity
-                    })
+                    df_balance = bs_t[req].replace([np.inf, -np.inf], np.nan).dropna(how="all")
                     fig_balance = go.Figure()
                     fig_balance.add_trace(go.Scatter(
-                        x=bs_t.index,
-                        y=total_assets,
-                        mode="lines+markers",
-                        name="Total Assets",
-                        line=dict(color=primary_blue)
-                    ))
+                        x=df_balance.index, y=df_balance["Total Assets"],
+                        mode="lines+markers", name="Total Assets",
+                        line=dict(color=primary_blue)))
                     fig_balance.add_trace(go.Scatter(
-                        x=bs_t.index,
-                        y=total_liabilities,
-                        mode="lines+markers",
-                        name="Total Liabilities",
-                        line=dict(color=primary_orange)
-                    ))
+                        x=df_balance.index, y=df_balance["Total Liabilities Net Minority Interest"],
+                        mode="lines+markers", name="Total Liabilities",
+                        line=dict(color=primary_orange)))
                     fig_balance.add_trace(go.Scatter(
-                        x=bs_t.index,
-                        y=total_equity,
-                        mode="lines+markers",
-                        name="Total Equity",
-                        line=dict(color=primary_pink)
-                    ))
+                        x=df_balance.index, y=df_balance["Total Equity Gross Minority Interest"],
+                        mode="lines+markers", name="Total Equity",
+                        line=dict(color=primary_pink)))
                     fig_balance.update_layout(
                         title="Evolución del Balance: Activos, Pasivos y Capital",
-                        xaxis_title="Año",
-                        yaxis_title="Valor (USD)",
-                        height=450,
-                        margin=dict(l=30, r=30, t=60, b=30)
-                    )
-                    st.plotly_chart(fig_balance, use_container_width=True, key="plotly_chart_balance")
+                        xaxis_title="Año", yaxis_title="Valor (USD)",
+                        height=450, margin=dict(l=30, r=30, t=60, b=30))
+                    st.plotly_chart(fig_balance, use_container_width=True,
+                                    key="plotly_chart_balance")
             except Exception as e:
                 st.warning(f"No se pudo generar el gráfico del Balance: {e}")
-            
+
+            # ------------------------------------------------------------------
+            # Tabla completa
+            # ------------------------------------------------------------------
             st.markdown("#### Balance en detalle")
             st.dataframe(ticker_data.balance_sheet.iloc[::-1], height=300)
+
 
 
             # BLOQUE 5: Análisis Fundamental - Estado de Resultados
         # ==========================
         with st.expander(f"📝 Análisis Fundamental - Estado de Resultados de {ticker_input}"):
-            st.subheader(f"📝 Evolución de los Ingresos")
+
+            # ------------------------------------------------------------------
+            # 5-A  Ingresos
+            # ------------------------------------------------------------------
+            st.subheader("📝 Evolución de los Ingresos")
             try:
-                income = ticker_data.financials.transpose()
+                income = (ticker_data.financials.transpose()
+                                        .apply(pd.to_numeric, errors="coerce")
+                                        .replace([np.inf, -np.inf], np.nan)
+                                        .dropna(how="all"))
                 income.index = income.index.year
-                income = income.apply(pd.to_numeric, errors="coerce")
 
-                if "Total Revenue" not in income.columns or "Gross Profit" not in income.columns or "Operating Income" not in income.columns:
-                    st.warning("No se encontraron suficientes datos en el Estado de Resultados para generar el gráfico de ingresos.")
+                if not {"Total Revenue", "Gross Profit", "Operating Income"} <= set(income.columns):
+                    st.warning("No hay suficientes datos para graficar ingresos.")
                 else:
-                    total_revenue = income["Total Revenue"]
-                    gross_profit = income["Gross Profit"]
-                    operating_income = income["Operating Income"]
-
+                    df_income = income[["Total Revenue", "Gross Profit", "Operating Income"]].copy()
                     if "Net Income" in income.columns:
-                        net_income = income["Net Income"]
+                        df_income["Net Income"] = income["Net Income"]
                     elif "Net Income from Continuing Operation Net Minority Interest" in income.columns:
-                        net_income = income["Net Income from Continuing Operation Net Minority Interest"]
-                    else:
-                        net_income = None
+                        df_income["Net Income"] = income["Net Income from Continuing Operation Net Minority Interest"]
 
-                    df_income = pd.DataFrame({
-                        "Total Revenue": total_revenue,
-                        "Gross Profit": gross_profit,
-                        "Operating Income": operating_income
-                    })
-                    if net_income is not None:
-                        df_income["Net Income"] = net_income
+                    df_income = df_income.dropna(how="all")          # evita barras huecas
 
                     primary_gold = "gold"
-
                     fig_income = go.Figure()
-                    fig_income.add_trace(go.Bar(
-                        x=df_income.index,
-                        y=df_income["Total Revenue"],
-                        name="Total Revenue",
-                        marker_color=primary_blue,
-                        text=[f"${val:,.0f}" for val in df_income["Total Revenue"]],
-                        textposition='outside'
-                    ))
-                    fig_income.add_trace(go.Bar(
-                        x=df_income.index,
-                        y=df_income["Gross Profit"],
-                        name="Gross Profit",
-                        marker_color=primary_orange,
-                        text=[f"${val:,.0f}" for val in df_income["Gross Profit"]],
-                        textposition='outside'
-                    ))
-                    fig_income.add_trace(go.Bar(
-                        x=df_income.index,
-                        y=df_income["Operating Income"],
-                        name="Operating Income",
-                        marker_color=primary_pink,
-                        text=[f"${val:,.0f}" for val in df_income["Operating Income"]],
-                        textposition='outside'
-                    ))
-                    if "Net Income" in df_income.columns:
-                        fig_income.add_trace(go.Bar(
-                            x=df_income.index,
-                            y=df_income["Net Income"],
-                            name="Net Income",
-                            marker_color=primary_gold,
-                            text=[f"${val:,.0f}" for val in df_income["Net Income"]],
-                            textposition='outside'
-                        ))
+                    for col, color in zip(df_income.columns,
+                                        [primary_blue, primary_orange,
+                                        primary_pink, primary_gold][:len(df_income.columns)]):
+                        serie = df_income[col].dropna()
+                        if not serie.empty:
+                            fig_income.add_trace(go.Bar(
+                                x=serie.index, y=serie.values, name=col,
+                                marker_color=color,
+                                text=[f"${v:,.0f}" for v in serie],
+                                textposition="outside"))
 
                     fig_income.update_layout(
                         title="Evolución de los Ingresos",
-                        xaxis_title="Año",
-                        yaxis_title="Valor (USD)",
-                        barmode="group",
-                        height=450,
-                        margin=dict(l=30, r=30, t=60, b=30)
-                    )
-
+                        xaxis_title="Año", yaxis_title="Valor (USD)",
+                        barmode="group", height=450,
+                        margin=dict(l=30, r=30, t=60, b=30))
                     st.plotly_chart(fig_income, use_container_width=True)
             except Exception as e:
-                st.warning(f"No se pudo generar el gráfico de Evolución de los Ingresos: {e}")
+                st.warning(f"No se pudo generar el gráfico de Ingresos: {e}")
 
-            st.subheader(f"📝 Evolución de Márgenes")
-
+            # ------------------------------------------------------------------
+            # 5-B  Márgenes
+            # ------------------------------------------------------------------
+            st.subheader("📝 Evolución de Márgenes")
             try:
-                income = ticker_data.financials.transpose()
-                income.index = income.index.year
-                income = income.apply(pd.to_numeric, errors="coerce")
-
-                if 'Total Revenue' in income.columns and 'Gross Profit' in income.columns:
-                    ingresos = income['Total Revenue']
-                    bruto = income['Gross Profit']
-                    margen_bruto = (bruto / ingresos * 100).round(1)
+                ingresos = income.get("Total Revenue")
+                if ingresos is None:
+                    st.warning("No hay columna 'Total Revenue'; no se calculan márgenes.")
                 else:
-                    margen_bruto = None
+                    series_margenes = {}
+                    if "Gross Profit" in income.columns:
+                        series_margenes["Margen Bruto (%)"] = (income["Gross Profit"] / ingresos * 100)
+                    if "Operating Income" in income.columns:
+                        series_margenes["Margen Operativo (%)"] = (income["Operating Income"] / ingresos * 100)
+                    if "Net Income" in income.columns:
+                        series_margenes["Margen Neto (%)"] = (income["Net Income"] / ingresos * 100)
 
-                if 'Operating Income' in income.columns:
-                    operativo = income['Operating Income']
-                    margen_operativo = (operativo / ingresos * 100).round(1)
-                else:
-                    margen_operativo = None
-
-                if 'Net Income' in income.columns:
-                    neto = income['Net Income']
-                    margen_neto = (neto / ingresos * 100).round(1)
-                else:
-                    margen_neto = None
-
-                fig = go.Figure()
-                if margen_bruto is not None:
-                    fig.add_trace(go.Scatter(x=margen_bruto.index, y=margen_bruto.values,
-                                            name="Margen Bruto (%)", mode="lines+markers",
-                                            line=dict(color=primary_blue)))
-                if margen_operativo is not None:
-                    fig.add_trace(go.Scatter(x=margen_operativo.index, y=margen_operativo.values,
-                                            name="Margen Operativo (%)", mode="lines+markers",
-                                            line=dict(color=primary_orange)))
-                if margen_neto is not None:
-                    fig.add_trace(go.Scatter(x=margen_neto.index, y=margen_neto.values,
-                                            name="Margen Neto (%)", mode="lines+markers",
-                                            line=dict(color=primary_pink)))
-
-                fig.update_layout(
-                    title="Evolución de Márgenes (% sobre ventas)",
-                    xaxis_title="Año",
-                    yaxis_title="% Margen",
-                    height=450,
-                    margin=dict(l=30, r=30, t=60, b=30)
-                )
-
-                st.plotly_chart(fig, use_container_width=True)
-
+                    fig = go.Figure()
+                    for nombre, serie in series_margenes.items():
+                        serie = (serie.replace([np.inf, -np.inf], np.nan)
+                                    .dropna()
+                                    .round(1))
+                        if not serie.empty:
+                            color = {"Margen Bruto (%)": primary_blue,
+                                    "Margen Operativo (%)": primary_orange,
+                                    "Margen Neto (%)": primary_pink}[nombre]
+                            fig.add_trace(go.Scatter(x=serie.index, y=serie.values,
+                                                    mode="lines+markers", name=nombre,
+                                                    line=dict(color=color)))
+                    if not fig.data:
+                        st.warning("Sin datos suficientes para márgenes.")
+                    else:
+                        fig.update_layout(
+                            title="Evolución de Márgenes (% sobre ventas)",
+                            xaxis_title="Año", yaxis_title="% Margen",
+                            height=450,
+                            margin=dict(l=30, r=30, t=60, b=30))
+                        st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
                 st.warning(f"No se pudo generar el gráfico de márgenes: {e}")
-            
-            st.subheader(f"⏳ Evolución del EPS")
+
+            # ------------------------------------------------------------------
+            # 5-C  EPS
+            # ------------------------------------------------------------------
+            st.subheader("⏳ Evolución del EPS")
             try:
-                # Usamos el EPS Actual obtenido anteriormente
                 if eps_actual is not None:
-                    st.subheader(f"📌 El EPS actual es del {eps_actual:.2f}")
+                    st.subheader(f"📌 El EPS actual es de ${eps_actual:.2f}")
                 else:
                     st.warning("EPS actual no disponible.")
 
-                # Continuamos con la generación del gráfico de evolución del EPS (usando "Diluted EPS" si existe)
-                income = ticker_data.financials.transpose()
-                income.index = income.index.year
-                income = income.apply(pd.to_numeric, errors="coerce")
-
-                if "Diluted EPS" not in income.columns:
-                    st.warning("No se encontró 'Diluted EPS' en el Estado de Resultados para este ticker.")
+                diluted_eps = income.get("Diluted EPS")
+                if diluted_eps is None:
+                    st.warning("No se encontró 'Diluted EPS' para este ticker.")
                 else:
-                    diluted_eps = income["Diluted EPS"].sort_index()
-
+                    diluted_eps = diluted_eps.dropna()
                     fig_eps = go.Figure()
                     fig_eps.add_trace(go.Bar(
-                        x=diluted_eps.index,
-                        y=diluted_eps.values,
-                        name="Diluted EPS",
-                        marker_color=primary_orange,
-                        text=[f"${val:.2f}" for val in diluted_eps.values],
-                        textposition='outside'
-                    ))
-
+                        x=diluted_eps.index, y=diluted_eps.values,
+                        name="Diluted EPS", marker_color=primary_orange,
+                        text=[f"${v:.2f}" for v in diluted_eps],
+                        textposition="outside"))
                     fig_eps.update_layout(
                         title="Evolución del Diluted EPS",
-                        xaxis_title="Año",
-                        yaxis_title="Diluted EPS (USD)",
-                        height=450,
-                        margin=dict(l=30, r=30, t=60, b=30)
-                    )
-
-                    st.plotly_chart(fig_eps, use_container_width=True, key="plotly_chart_eps")
+                        xaxis_title="Año", yaxis_title="Diluted EPS (USD)",
+                        height=450, margin=dict(l=30, r=30, t=60, b=30))
+                    st.plotly_chart(fig_eps, use_container_width=True,
+                                    key="plotly_chart_eps")
             except Exception as e:
                 st.warning(f"No se pudo generar el gráfico de Diluted EPS: {e}")
 
-            
-            st.subheader(f"🔄 Evolución de Acciones en Circulación")
-
+            # ------------------------------------------------------------------
+            # 5-D  Acciones en circulación
+            # ------------------------------------------------------------------
+            st.subheader("🔄 Evolución de Acciones en Circulación")
             try:
                 bs = ticker_data.balance_sheet
                 if "Ordinary Shares Number" not in bs.index:
-                    st.warning("No se encontró 'Ordinary Shares Number' en el Balance Sheet para este ticker.")
+                    st.warning("No se encontró 'Ordinary Shares Number' en el Balance Sheet.")
                 else:
-                    ordinary_shares = bs.loc["Ordinary Shares Number"]
-                    ordinary_shares = ordinary_shares.dropna()
-                    ordinary_shares.index = pd.to_datetime(ordinary_shares.index)
-                    ordinary_shares = ordinary_shares.sort_index()
-                    ordinary_shares_yearly = ordinary_shares.resample("Y").last()
-                    ordinary_shares_yearly = ordinary_shares_yearly.dropna()
-                    ordinary_shares_yearly.index = ordinary_shares_yearly.index.year
+                    ordinary = (bs.loc["Ordinary Shares Number"]
+                                .apply(pd.to_numeric, errors="coerce")
+                                .dropna())
+                    ordinary.index = pd.to_datetime(ordinary.index).year
+                    ordinary = ordinary.sort_index()
+                    ordinary_y = ordinary.resample("Y").last().dropna()
+                    ordinary_y.index = ordinary_y.index.year
 
-                    if ordinary_shares_yearly.empty:
-                        st.warning("No hay datos de acciones en circulación disponibles después de filtrar los valores faltantes.")
+                    if ordinary_y.empty:
+                        st.warning("No hay datos válidos de acciones en circulación.")
                     else:
                         fig_shares = go.Figure()
                         fig_shares.add_trace(go.Bar(
-                            x=ordinary_shares_yearly.index,
-                            y=ordinary_shares_yearly.values,
-                            name="Acciones en Circulación",
-                            marker_color=primary_blue,
-                            text=[f"{int(val):,}" for val in ordinary_shares_yearly.values],
-                            textposition='outside'
-                        ))
-
+                            x=ordinary_y.index, y=ordinary_y.values,
+                            name="Acciones en Circulación", marker_color=primary_blue,
+                            text=[f"{int(v):,}" for v in ordinary_y],
+                            textposition="outside"))
                         fig_shares.update_layout(
                             title="Evolución de Acciones en Circulación",
-                            xaxis_title="Año",
-                            yaxis_title="Acciones en Circulación",
-                            height=450,
-                            margin=dict(l=30, r=30, t=60, b=30)
-                        )
-
+                            xaxis_title="Año", yaxis_title="Acciones",
+                            height=450, margin=dict(l=30, r=30, t=60, b=30))
                         st.plotly_chart(fig_shares, use_container_width=True)
-
             except Exception as e:
                 st.warning(f"No se pudo generar el gráfico de Acciones en Circulación: {e}")
 
+            # ------------------------------------------------------------------
+            # Tabla completa
+            # ------------------------------------------------------------------
             st.markdown("#### Estado de Resultados en detalle")
-            # Se muestra la tabla tal como viene de YahooFinance (filas = cuentas, columnas = fechas)
             st.dataframe(ticker_data.financials.iloc[::-1], height=300)
 
         # ==========================
         # BLOQUE 6: Estado de Flujo de Efectivo
         # ==========================
         with st.expander(f"💵 Análisis Fundamental - Estado de Flujo de Efectivo de {ticker_input}"):
-            cf = ticker_data.cashflow
-            cf_t = cf.transpose()
-            cf_t.index = pd.to_datetime(cf_t.index, format="%m/%d/%Y", errors="coerce")
-            cf_t = cf_t.dropna(subset=[cf_t.columns[0]])
-            cf_t.index = cf_t.index.year
 
+            # ------------------------------------------------------------------
+            # 6-A  Pre-procesamiento del Cash-Flow
+            # ------------------------------------------------------------------
+            cf = (ticker_data.cashflow.transpose()
+                    .apply(pd.to_numeric, errors="coerce")
+                    .replace([np.inf, -np.inf], np.nan)
+                    .dropna(how="all"))
+            cf.index = pd.to_datetime(cf.index, errors="coerce").year
+
+            # copia para series “anchas”
+            cf_t = cf.copy()
+
+            # ------------------------------------------------------------------
+            # 6-B  Operating CF, CapEx y FCF (%)
+            # ------------------------------------------------------------------
             st.subheader("🛒 Flujo de Caja: Operating CF, CaPex y FCF (%)")
             try:
-                cf = ticker_data.cashflow.transpose()
-                cf.index = pd.to_datetime(cf.index, format="%m/%d/%Y", errors="coerce")
-                cf = cf.dropna(subset=[cf.columns[0]])
-                cf.index = cf.index.year
-                if "Operating Cash Flow" not in cf.columns or "Capital Expenditure" not in cf.columns:
-                    st.warning("No se encontraron 'Operating Cash Flow' y/o 'Capital Expenditure' en el Flujo de Efectivo.")
-                else:
-                    op_cf = cf["Operating Cash Flow"]
-                    capex = cf["Capital Expenditure"]
-                    adj_capex = -1 * capex
-                    fcf = op_cf - adj_capex
-                    fcf_pct = (fcf / op_cf) * 100
-                    df_cf = cf.copy()
-                    df_cf["FCF"] = fcf
-                    df_cf["FCF (%)"] = fcf_pct
+                if {"Operating Cash Flow", "Capital Expenditure"} <= set(cf.columns):
+                    op_cf  = cf["Operating Cash Flow"].dropna()
+                    capex  = cf["Capital Expenditure"].dropna()
+                    adj_capex = -capex                               # signo positivo ↓
+                    fcf   = (op_cf + capex).dropna()
+                    fcf_pct = (fcf / op_cf.replace(0, np.nan) * 100).replace([np.inf, -np.inf], np.nan)
+
                     fig_cf = go.Figure()
-                    fig_cf.add_trace(go.Bar(
-                        x=cf.index,
-                        y=op_cf,
-                        name="Operating Cash Flow",
-                        marker_color=primary_blue,
-                        text=[f"${val:,.0f}" for val in op_cf],
-                        textposition='outside'
-                    ))
-                    fig_cf.add_trace(go.Bar(
-                        x=cf.index,
-                        y=adj_capex,
-                        name="Capital Expenditure (abs)",
-                        marker_color=primary_orange,
-                        text=[f"${val:,.0f}" for val in adj_capex],
-                        textposition='outside'
-                    ))
-                    fig_cf.add_trace(go.Scatter(
-                        x=cf.index,
-                        y=fcf_pct,
-                        name="FCF (%)",
-                        mode="lines+markers+text",
-                        yaxis="y2",
-                        line=dict(color=primary_pink),
-                        text=[f"{val:.2f}%" for val in fcf_pct],
-                        textposition="top right"
-                    ))
+                    for serie, name, color in [
+                        (op_cf,      "Operating Cash Flow",           primary_blue),
+                        (adj_capex,  "Capital Expenditure (abs)",     primary_orange)]:
+                        if not serie.empty:
+                            fig_cf.add_trace(go.Bar(
+                                x=serie.index, y=serie.values, name=name,
+                                marker_color=color,
+                                text=[f"${v:,.0f}" for v in serie],
+                                textposition="outside"))
+                    # línea FCF %
+                    if not fcf_pct.dropna().empty:
+                        fig_cf.add_trace(go.Scatter(
+                            x=fcf_pct.index, y=fcf_pct.values,
+                            name="FCF (%)", mode="lines+markers+text",
+                            yaxis="y2", line=dict(color=primary_pink),
+                            text=[f"{v:.1f}%" for v in fcf_pct],
+                            textposition="top right"))
+
                     fig_cf.update_layout(
                         title="Flujo de Caja: Operating CF, CaPex y FCF (%)",
                         xaxis_title="Año",
                         yaxis=dict(title="Valores (USD)"),
                         yaxis2=dict(title="FCF (%)", overlaying="y", side="right"),
-                        barmode="group",
-                        height=450,
-                        margin=dict(l=30, r=30, t=60, b=30)
-                    )
+                        barmode="group", height=450,
+                        margin=dict(l=30, r=30, t=60, b=30))
                     st.plotly_chart(fig_cf, use_container_width=True, key="plotly_chart_cf")
-                    
+                else:
+                    st.warning("No se encontraron 'Operating Cash Flow' o 'Capital Expenditure'.")
             except Exception as e:
                 st.warning(f"No se pudo generar el gráfico combinado: {e}")
 
+            # ------------------------------------------------------------------
+            # 6-C  Emisión / Pago de deuda y Recompra de acciones
+            # ------------------------------------------------------------------
+            def barra_simple(serie: pd.Series, titulo: str, color: str, key_plot: str):
+                serie = pd.to_numeric(serie, errors="coerce").dropna()
+                if serie.empty:
+                    st.warning(f"No hay datos para {titulo.lower()}.")
+                    return
+                fig = go.Figure()
+                fig.add_trace(go.Bar(
+                    x=serie.index, y=serie.values,
+                    name=titulo, marker_color=color,
+                    text=[f"${v:,.0f}" for v in serie],
+                    textposition="outside"))
+                fig.update_layout(
+                    title=titulo, xaxis_title="Año", yaxis_title="Valor (USD)",
+                    height=450, margin=dict(l=30, r=30, t=60, b=30))
+                st.plotly_chart(fig, use_container_width=True, key=key_plot)
+                return serie
+
+            # Emisión
             st.subheader("💳 Emisión de Deuda")
-            try:
-                key_issuance = "Issuance Of Debt"
-                if key_issuance not in cf_t.columns:
-                    st.warning(f"No se encontró '{key_issuance}' en el Flujo de Efectivo.")
-                else:
-                    issuance = cf_t[key_issuance]
-                    issuance = pd.to_numeric(issuance, errors='coerce')
-                    fig_issuance = go.Figure()
-                    fig_issuance.add_trace(go.Bar(
-                        x=cf_t.index,
-                        y=issuance,
-                        name=key_issuance,
-                        marker_color=primary_blue,
-                        text=[f"${val:,.0f}" for val in issuance],
-                        textposition='outside'
-                    ))
-                    x_vals = np.array(cf_t.index, dtype=float)
-                    y_vals = np.array(issuance, dtype=float)
-                    slope, intercept = np.polyfit(x_vals, y_vals, 1)
-                    trend = slope * x_vals + intercept
-                    fig_issuance.add_trace(go.Scatter(
-                        x=cf_t.index,
-                        y=trend,
-                        mode="lines",
-                        name="Tendencia",
-                        line=dict(color="hotpink", dash="dash")
-                    ))
-                    fig_issuance.update_layout(
-                        title="Emisión de Deuda",
-                        xaxis_title="Año",
-                        yaxis_title="Valor (USD)",
-                        height=450,
-                        margin=dict(l=30, r=30, t=60, b=30)
-                    )
-                    st.plotly_chart(fig_issuance, use_container_width=True, key="plotly_chart_issuance")
-            except Exception as e:
-                st.warning(f"No se pudo generar el gráfico de Emisión de Deuda: {e}")
+            issuance = barra_simple(cf_t.get("Issuance Of Debt"), "Emisión de Deuda",
+                                    primary_blue, "plotly_chart_issuance")
 
+            # tendencia sólo si hay ≥2 puntos
+            if issuance is not None and len(issuance) > 1:
+                fig = st.session_state.get("plotly_chart_issuance")
+                serie_clean = issuance.dropna()
+                if len(serie_clean) > 1:
+                    coef = np.polyfit(serie_clean.index.astype(float), serie_clean.values, 1)
+                    trend = coef[0] * serie_clean.index + coef[1]
+                    fig.add_trace(go.Scatter(
+                        x=serie_clean.index, y=trend,
+                        mode="lines", name="Tendencia",
+                        line=dict(color="hotpink", dash="dash")))
+
+            # Pago
             st.subheader("🏛️ Pago de Deuda")
-            try:
-                key_repayment = "Repayment Of Debt"
-                if key_repayment not in cf_t.columns:
-                    st.warning(f"No se encontró '{key_repayment}' en el Flujo de Efectivo.")
-                else:
-                    repayment = cf_t[key_repayment]
-                    fig_repayment = go.Figure()
-                    fig_repayment.add_trace(go.Bar(
-                        x=cf_t.index,
-                        y=repayment,
-                        name=key_repayment,
-                        marker_color=primary_orange,
-                        text=[f"${val:,.0f}" for val in repayment],
-                        textposition='outside'
-                    ))
-                    fig_repayment.update_layout(
-                        title="Pago de Deuda",
-                        xaxis_title="Año",
-                        yaxis_title="Valor (USD)",
-                        height=450,
-                        margin=dict(l=30, r=30, t=60, b=30)
-                    )
-                    st.plotly_chart(fig_repayment, use_container_width=True, key="plotly_chart_repayment")
-            except Exception as e:
-                st.warning(f"No se pudo generar el gráfico de Pago de Deuda: {e}")
+            barra_simple(cf_t.get("Repayment Of Debt"), "Pago de Deuda",
+                        primary_orange, "plotly_chart_repayment")
 
+            # Recompra
             st.subheader("♻️ Recompra de Acciones")
-            try:
-                key_repurchase = "Repurchase Of Capital Stock"
-                if key_repurchase not in cf_t.columns:
-                    st.warning(f"No se encontró '{key_repurchase}' en el Flujo de Efectivo.")
-                else:
-                    repurchase = cf_t[key_repurchase]
-                    fig_repurchase = go.Figure()
-                    fig_repurchase.add_trace(go.Bar(
-                        x=cf_t.index,
-                        y=repurchase,
-                        name=key_repurchase,
-                        marker_color=primary_pink,
-                        text=[f"${val:,.0f}" for val in repurchase],
-                        textposition='outside'
-                    ))
-                    fig_repurchase.update_layout(
-                        title="Recompra de Acciones",
-                        xaxis_title="Año",
-                        yaxis_title="Valor (USD)",
-                        height=450,
-                        margin=dict(l=30, r=30, t=60, b=30)
-                    )
-                    st.plotly_chart(fig_repurchase, use_container_width=True, key="plotly_chart_repurchase")
-            except Exception as e:
-                st.warning(f"No se pudo generar el gráfico de Recompra de Acciones: {e}")
+            barra_simple(cf_t.get("Repurchase Of Capital Stock"), "Recompra de Acciones",
+                        primary_pink, "plotly_chart_repurchase")
 
+            # ------------------------------------------------------------------
+            # 6-D  Tabla
+            # ------------------------------------------------------------------
             st.markdown("#### Estado de Flujo de Efectivo en detalle")
             st.dataframe(ticker_data.cashflow.iloc[::-1], height=300)
+
+
     # --------------------------
         # Sección: Precios Objetivo (con entrada de Yield Deseado aquí)
         # --------------------------

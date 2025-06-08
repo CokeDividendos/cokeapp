@@ -1594,5 +1594,3 @@ with tabs[0]:
 
     except Exception as e: 
         st.error(f"Ocurrió un error al obtener los datos: {e}")
-
-        git 

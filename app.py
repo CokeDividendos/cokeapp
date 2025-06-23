@@ -577,8 +577,13 @@ with tabs[0]:
                                     .apply(pd.to_numeric, errors="coerce"))
                 cf.index = cf.index.year
 
-                total_debt = bs.get("Total Debt")          or bs.get("Long Term Debt")
-                cash       = bs.get("Cash And Cash Equivalents") or bs.get("Cash")
+                total_debt = bs.get("Total Debt")
+                if total_debt is None:
+                    total_debt = bs.get("Long Term Debt")
+
+                cash = bs.get("Cash And Cash Equivalents")
+                if cash is None:
+                    cash = bs.get("Cash")
                 fcf        = cf.get("Free Cash Flow")
 
                 df_deuda = pd.DataFrame({
@@ -682,8 +687,13 @@ with tabs[0]:
                 bs = (ticker_data.balance_sheet.transpose()
                                     .apply(pd.to_numeric, errors="coerce"))
                 bs.index = bs.index.year
-                total_debt = bs.get("Total Debt") or bs.get("Long Term Debt")
-                cash       = bs.get("Cash And Cash Equivalents") or bs.get("Cash")
+                total_debt = bs.get("Total Debt")
+                if total_debt is None:
+                    total_debt = bs.get("Long Term Debt")
+
+                cash = bs.get("Cash And Cash Equivalents")
+                if cash is None:
+                    cash = bs.get("Cash")
                 net_debt   = total_debt - cash if total_debt is not None and cash is not None else None
 
                 market_cap = ticker_data.info.get("marketCap")
@@ -1084,7 +1094,7 @@ with tabs[0]:
                     ordinary = (bs.loc["Ordinary Shares Number"]
                                 .apply(pd.to_numeric, errors="coerce")
                                 .dropna())
-                    ordinary.index = pd.to_datetime(ordinary.index).year
+                    ordinary.index = pd.to_datetime(ordinary.index)
                     ordinary = ordinary.sort_index()
                     ordinary_y = ordinary.resample("Y").last().dropna()
                     ordinary_y.index = ordinary_y.index.year

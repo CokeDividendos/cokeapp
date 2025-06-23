@@ -60,18 +60,23 @@ if not IS_CLOUD:
     except Exception as e:
         st.warning(f"No se cargó curl_cffi: {e}")
 
-# ───── Funciones de descarga resiliente ─────────────────────────────────────────────────────
-@tenacity.retry(stop=tenacity.stop_after_attempt(4),
-                wait=tenacity.wait_exponential(multiplier=2, min=2, max=10),
-                reraise=True)
+# ───── Funciones de descarga resiliente ────────────────────────────────
+@tenacity.retry(
+    stop=tenacity.stop_after_attempt(4),
+    wait=tenacity.wait_exponential(multiplier=2, min=2, max=10),
+    reraise=True,
+)
 def safe_history(ticker: str, *, period: str, interval: str) -> pd.DataFrame:
-    """History con reintentos usando la sesión elegida (puede lanzar HTTPError)."""
-    return yf.Ticker(ticker, session=YF_SESSION).history(period=period, interval=interval)
+    """Descarga .history() con reintentos usando la sesión elegida."""
+    return yf.Ticker(ticker, session=YF_SESSION).history(
+        period=period, interval=interval
+    )
 
 def history_resiliente(ticker: str, *, period: str, interval: str) -> pd.DataFrame:
     """
-    Llama a safe_history(); si Yahoo devuelve 401 (sesión invalidada)
-    reintenta inmediatamente con la sesión estándar de yfinance.
+    Llama a safe_history().  
+    Si Yahoo devuelve 401 (sesión invalidada) reintenta inmediatamente con la
+    sesión estándar de yfinance.
     """
     try:
         return safe_history(ticker, period=period, interval=interval)
@@ -79,7 +84,7 @@ def history_resiliente(ticker: str, *, period: str, interval: str) -> pd.DataFra
         if getattr(e.response, "status_code", None) == 401:
             st.warning("⚠️ Yahoo devolvió 401; reintento sin sesión especial…")
             return yf.Ticker(ticker).history(period=period, interval=interval)
-        # cualquier otro error se propaga
+        # para cualquier otro código de error, propaga la excepción
         raise
 
 # ╔═════════════ 3) HELPERS  (logo y resumen IA) ═════════════════════════════════════════════

@@ -1176,11 +1176,11 @@ with tabs[0]:
             # ------------------------------------------------------------------
             # 6-C  Emisión / Pago de deuda y Recompra de acciones
             # ------------------------------------------------------------------
-            def barra_simple(serie: pd.Series, titulo: str, color: str, key_plot: str):
+            def barra_simple(serie: pd.Series, titulo: str, color: str, key_plot: str, show: bool = True):
                 serie = pd.to_numeric(serie, errors="coerce").dropna()
                 if serie.empty:
                     st.warning(f"No hay datos para {titulo.lower()}.")
-                    return
+                    return None, None
                 fig = go.Figure()
                 fig.add_trace(go.Bar(
                     x=serie.index, y=serie.values,
@@ -1190,25 +1190,28 @@ with tabs[0]:
                 fig.update_layout(
                     title=titulo, xaxis_title="Año", yaxis_title="Valor (USD)",
                     height=450, margin=dict(l=30, r=30, t=60, b=30))
-                st.plotly_chart(fig, use_container_width=True, key=key_plot)
-                return serie
+                if show:
+                    st.plotly_chart(fig, use_container_width=True, key=key_plot)
+                return serie, fig
 
             # Emisión
-            st.subheader("💳 Emisión de Deuda")
-            issuance = barra_simple(cf_t.get("Issuance Of Debt"), "Emisión de Deuda",
-                                    primary_blue, "plotly_chart_issuance")
+            issuance, fig_issuance = barra_simple(
+                cf_t.get("Issuance Of Debt"), "Emisión de Deuda",
+                primary_blue, "plotly_chart_issuance", show=False)
+
 
             # tendencia sólo si hay ≥2 puntos
             if issuance is not None and len(issuance) > 1:
-                fig = st.session_state.get("plotly_chart_issuance")
+                
                 serie_clean = issuance.dropna()
                 if len(serie_clean) > 1:
                     coef = np.polyfit(serie_clean.index.astype(float), serie_clean.values, 1)
                     trend = coef[0] * serie_clean.index + coef[1]
-                    fig.add_trace(go.Scatter(
+                    fig_issuance.add_trace(go.Scatter(
                         x=serie_clean.index, y=trend,
                         mode="lines", name="Tendencia",
                         line=dict(color="hotpink", dash="dash")))
+                    st.plotly_chart(fig_issuance, use_container_width=True, key="plotly_chart_issuance")
 
             # Pago
             st.subheader("🏛️ Pago de Deuda")
@@ -1227,7 +1230,7 @@ with tabs[0]:
             st.dataframe(ticker_data.cashflow.iloc[::-1], height=300)
 
 
-    # --------------------------
+        # --------------------------
         # Sección: Precios Objetivo (con entrada de Yield Deseado aquí)
         # --------------------------
         
@@ -1251,23 +1254,24 @@ with tabs[0]:
                 else:
                     cagr_gw = None
                 current_year = pd.Timestamp.today().year
+
                 def ajustar_dividendo(year):
                     if (year == current_year) and (cagr_gw is not None) and ((year - 1) in annual_dividends_gw.index):
                         return annual_dividends_gw[year - 1] * (1 + cagr_gw/100)
-                    else:
-                        return annual_dividends_gw.get(year, None)
-                    monthly_data = price_data_diario.resample("M").last().reset_index()
-                    monthly_data['Año'] = monthly_data['Date'].dt.year
-                    monthly_data['Mes'] = monthly_data['Date'].dt.strftime("%B")
-                    monthly_data.rename(columns={'Close': 'Precio'}, inplace=True)
-                    monthly_data['Dividendo Anual'] = monthly_data['Año'].apply(ajustar_dividendo)
-                    monthly_data['Yield'] = monthly_data['Dividendo Anual'] / monthly_data['Precio']
-                    overall_yield_max = monthly_data['Yield'].max()
-                    monthly_data['Precio Infravalorado'] = monthly_data['Dividendo Anual'] / overall_yield_max
-                    monthly_data = monthly_data.sort_values(by='Date')
-                    valor_infravalorado = monthly_data.iloc[-1]['Precio Infravalorado']
+                    return annual_dividends_gw.get(year, None)
+
+                monthly_data = price_data_diario.resample("M").last().reset_index()
+                monthly_data['Año'] = monthly_data['Date'].dt.year
+                monthly_data['Mes'] = monthly_data['Date'].dt.strftime("%B")
+                monthly_data.rename(columns={'Close': 'Precio'}, inplace=True)
+                monthly_data['Dividendo Anual'] = monthly_data['Año'].apply(ajustar_dividendo)
+                monthly_data['Yield'] = monthly_data['Dividendo Anual'] / monthly_data['Precio']
+                overall_yield_max = monthly_data['Yield'].max()
+                monthly_data['Precio Infravalorado'] = monthly_data['Dividendo Anual'] / overall_yield_max
+                monthly_data = monthly_data.sort_values(by='Date')
+                valor_infravalorado = monthly_data.iloc[-1]['Precio Infravalorado']
         else:
-                    valor_infravalorado = None
+                valor_infravalorado = None
                         
         key_cols[1].metric("💎 Precio Infrav. G. Weiss", f"${valor_infravalorado:.2f}" if valor_infravalorado is not None else "N/A")
         key_cols[2].metric("📊 Valor Libro Precio Justo", f"${fair_price:.2f}" if fair_price is not None else "N/A")
@@ -1287,7 +1291,7 @@ with tabs[0]:
                 # --------------------------
         otros_datos = {
                             "ROE Actual": f"{roe_actual*100:.2f}%" if roe_actual is not None else "N/A",
-                            "PauOut": f"{payout_ratio*100:.2f}%" if payout_ratio is not None else "N/A",
+                            "PayOut": f"{payout_ratio*100:.2f}%" if payout_ratio is not None else "N/A",
                             "EPS Actual": f"${eps_actual:.2f}" if eps_actual is not None else "N/A",
                             "PER": f"{pe_ratio:.2f}" if pe_ratio is not None else "N/A",
                             "P/B": f"{pb:.2f}" if pb is not None else "N/A",

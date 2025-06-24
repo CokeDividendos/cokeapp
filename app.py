@@ -165,7 +165,7 @@ with tabs[0]:
         with col_title:
             st.title(f" {info.get('longName', ticker_input)}")
             # sector / industria justo bajo el título
-            st.markdown(f"**🏷️ Sector:** {info.get('sector','N/D')}   |   **🏭 Industria:** {info.get('industry','N/D')}")
+            st.markdown(f"**Sector:** {info.get('sector','N/D')}   |   **Industria:** {info.get('industry','N/D')}")
 
         ########################  RESUMEN BREVE IA  ###########################################
         if info.get("longBusinessSummary"):
@@ -263,17 +263,17 @@ with tabs[0]:
         # ─── Métricas en cabecera ───────────────────────────────────
         st.markdown(f"### 🚨 Datos Principales de {ticker_input}")
         col1,col2,col3,col4,col5,col6,col7 = st.columns(7)
-        col1.metric("💰 Precio",     f"${price:.2f}"        if pd.notna(price)        else "N/D")
-        col2.metric("🏦 Dividendo",  f"${dividend:.2f}"     if pd.notna(dividend)     else "N/D")
-        col3.metric("📈 Yield",      f"{yield_actual:.2f}%" if pd.notna(yield_actual) else "N/D")
-        col4.metric("📊 PER",        f"{pe_ratio:.2f}x"     if pd.notna(pe_ratio)     else "N/D")
-        col5.metric("🔁 Pay-out",    f"{payout_ratio*100:.2f}%" if pd.notna(payout_ratio) else "N/D")
-        col6.metric("🧾 EPS",        f"${eps_actual:.2f}"   if pd.notna(eps_actual)   else "N/D")
-        col7.metric("⏳ CAGR div",   f"{cagr_dividend:.2f}%"if pd.notna(cagr_dividend)else "N/D")
+        col1.metric("Precio",     f"${price:.2f}"        if pd.notna(price)        else "N/D")
+        col2.metric("Dividendo",  f"${dividend:.2f}"     if pd.notna(dividend)     else "N/D")
+        col3.metric("Yield",      f"{yield_actual:.2f}%" if pd.notna(yield_actual) else "N/D")
+        col4.metric("PER",        f"{pe_ratio:.2f}x"     if pd.notna(pe_ratio)     else "N/D")
+        col5.metric("Pay-out",    f"{payout_ratio*100:.2f}%" if pd.notna(payout_ratio) else "N/D")
+        col6.metric("EPS",        f"${eps_actual:.2f}"   if pd.notna(eps_actual)   else "N/D")
+        col7.metric("CAGR div",   f"{cagr_dividend:.2f}%"if pd.notna(cagr_dividend)else "N/D")
 
         # ─── Precio histórico + Drawdown ────────────────────────────
         st.subheader("##")
-        st.subheader("📈 Precio Histórico de la Acción")
+        st.subheader("Precio Histórico de la Acción")
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(
@@ -287,7 +287,7 @@ with tabs[0]:
         )
         st.plotly_chart(fig, use_container_width=True, key="price_history")
 
-        st.subheader("⚠️ Drawdown Histórico")
+        st.subheader("Drawdown Histórico")
         try:
             running_max = price_data['Close'].cummax()
             drawdown    = (price_data['Close']/running_max - 1)*100
@@ -310,9 +310,9 @@ with tabs[0]:
         # ==========================
         # BLOQUE 2: Valoración por Dividendo
         # ==========================
-        st.subheader(f"🧐 Análisis y Valoración para {ticker_input}")
+        st.subheader(f"Análisis y Valoración para {ticker_input}")
 
-        with st.expander(f"💸 Análisis y Valoración por Dividendo de {ticker_input}"):
+        with st.expander(f"Análisis y Valoración por Dividendo de {ticker_input}"):
             # ---------- 2-A  Histórico anual de dividendos + CAGR ----------
             dividends = ticker_data.dividends
             if not dividends.empty:
@@ -354,7 +354,7 @@ with tabs[0]:
                 ))
 
             # ---------- 2-B  Sostenibilidad del dividendo ----------
-            st.subheader("♻️ Sostenibilidad del Dividendo")
+            st.subheader("Sostenibilidad del Dividendo")
             try:
                 cashflow = ticker_data.cashflow.transpose()
                 cashflow.index = cashflow.index.year
@@ -396,7 +396,7 @@ with tabs[0]:
                 st.warning(f"No se pudo generar el gráfico de sostenibilidad: {e}")
 
             # ---------- 2-C  Rentabilidad histórica ----------
-            st.subheader("📉 Rentabilidad por Dividendo Histórica")
+            st.subheader("Rentabilidad por Dividendo Histórica")
             try:
                 df_yield = price_data[["Close"]].copy()
                 df_yield["Año"] = df_yield.index.year
@@ -434,7 +434,7 @@ with tabs[0]:
                 st.warning(f"No se pudo generar el gráfico de yield: {e}")
 
             # ---------- 2-D  Método Geraldine Weiss ----------
-            st.subheader(f"💎 Método Geraldine Weiss: Datos, Resumen y Gráfico")
+            st.subheader(f"Método Geraldine Weiss: Datos, Resumen y Gráfico")
             try:
                 dividends = ticker_data.dividends
                 price_data_diario = ticker_data.history(period=selected_period, interval="1d")
@@ -478,13 +478,13 @@ with tabs[0]:
                     current_price_gw = ticker_data.info.get('currentPrice', price_data_diario['Close'].iloc[-1])
                     st.markdown("### 🚨 Datos Clave")
                     gw_cols = st.columns(7)
-                    gw_cols[0].metric("💰 Precio Actual", f"${current_price_gw:.2f}")
-                    gw_cols[1].metric("🏦 Dividendo Anual", f"${last_dividend:.2f}")
-                    gw_cols[2].metric("📊 CAGR Dividendo", f"{cagr_gw:.2f}%" if cagr_gw is not None else "N/A")
-                    gw_cols[3].metric("📈 Yield Máximo", f"{overall_yield_max:.2%}")
-                    gw_cols[4].metric("📉 Yield Mínimo", f"{overall_yield_min:.2%}")
-                    gw_cols[5].metric("🚫 Sobrevalorado", f"${last_dividend/overall_yield_min:.2f}")
-                    gw_cols[6].metric("✅ Infravalorado", f"${last_dividend/overall_yield_max:.2f}")
+                    gw_cols[0].metric("Precio Actual", f"${current_price_gw:.2f}")
+                    gw_cols[1].metric("Dividendo Anual", f"${last_dividend:.2f}")
+                    gw_cols[2].metric("CAGR Dividendo", f"{cagr_gw:.2f}%" if cagr_gw is not None else "N/A")
+                    gw_cols[3].metric("Yield Máximo", f"{overall_yield_max:.2%}")
+                    gw_cols[4].metric("Yield Mínimo", f"{overall_yield_min:.2%}")
+                    gw_cols[5].metric("Sobrevalorado", f"${last_dividend/overall_yield_min:.2f}")
+                    gw_cols[6].metric("Infravalorado", f"${last_dividend/overall_yield_max:.2f}")
                     annual_years = sorted(monthly_data['Año'].unique())
                     annual_bands = []
                     for year in annual_years:
@@ -563,10 +563,10 @@ with tabs[0]:
         # ==========================
         # BLOQUE 3: Valoración por Múltiplos
         # ==========================
-        with st.expander(f"💱 Análisis y Valoración por Múltiplos de {ticker_input}"):
+        with st.expander(f"Análisis y Valoración por Múltiplos de {ticker_input}"):
 
             # ---------- 3-A  Evolución de la Deuda ----------
-            st.subheader("💵 Evolución de la Deuda")
+            st.subheader("Evolución de la Deuda")
             try:
                 # Balance y Cash-Flow convertidos a float
                 bs = (
@@ -635,7 +635,7 @@ with tabs[0]:
                 st.warning(f"No se pudo generar el gráfico de deuda: {e}")
 
             # ---------- 3-B  Histórico PER ----------
-            st.subheader("📈 Histórico del PER, EPS y Precio")
+            st.subheader("Histórico del PER, EPS y Precio")
             try:
                 st.subheader(f"📌 El PER actual es de {pe_ratio:.2f}x")
                 income_statement = ticker_data.financials
@@ -683,7 +683,7 @@ with tabs[0]:
                 st.warning(f"No se pudo generar el gráfico PER: {e}")
 
             # ---------- 3-C  EV / EBITDA ----------
-            st.subheader("📐 Evolución de EV, EBITDA y EV/EBITDA")
+            st.subheader("Evolución de EV, EBITDA y EV/EBITDA")
             try:
                 income = (ticker_data.financials.transpose()
                                         .apply(pd.to_numeric, errors="coerce"))
@@ -755,12 +755,12 @@ with tabs[0]:
         # ==========================
         # BLOQUE 4: Análisis Fundamental - Balance
         # ==========================
-        with st.expander(f"⚖️ Análisis Fundamental - Balance de {ticker_input}"):
+        with st.expander(f"Análisis Fundamental - Balance de {ticker_input}"):
 
             # ------------------------------------------------------------------
             # 4-A  Activos totales vs corrientes
             # ------------------------------------------------------------------
-            st.subheader("🏢 Evolución de Activos Totales y Activos Corrientes")
+            st.subheader("Evolución de Activos Totales y Activos Corrientes")
             try:
                 bs_t = (ticker_data.balance_sheet.transpose()
                                         .apply(pd.to_numeric, errors="coerce")
@@ -819,7 +819,7 @@ with tabs[0]:
             # ------------------------------------------------------------------
             # 4-B  Pasivos totales / corrientes + Deuda
             # ------------------------------------------------------------------
-            st.subheader("💳 Evolución de Pasivos Totales y Pasivos Corrientes Totales")
+            st.subheader("Evolución de Pasivos Totales y Pasivos Corrientes Totales")
             try:
                 bs_t = (ticker_data.balance_sheet.transpose()
                                         .apply(pd.to_numeric, errors="coerce")
@@ -868,7 +868,7 @@ with tabs[0]:
                         st.dataframe(df_pasivos)
 
                 # ---------- Deuda total vs neta ----------
-                st.subheader("💰 Evolución de Deuda Total vs Deuda Neta")
+                st.subheader("Evolución de Deuda Total vs Deuda Neta")
                 total_debt = bs_t.get("Total Debt")
                 net_debt   = bs_t.get("Net Debt")
                 if total_debt is None or net_debt is None:
@@ -901,7 +901,7 @@ with tabs[0]:
             # ------------------------------------------------------------------
             # 4-C  Patrimonio
             # ------------------------------------------------------------------
-            st.subheader("💼 Evolución del Patrimonio")
+            st.subheader("Evolución del Patrimonio")
             try:
                 bs_t = (ticker_data.balance_sheet.transpose()
                                         .apply(pd.to_numeric, errors="coerce"))
@@ -931,7 +931,7 @@ with tabs[0]:
             # ------------------------------------------------------------------
             # 4-D  Visión 3-líneas (Assets / Liabilities / Equity)
             # ------------------------------------------------------------------
-            st.subheader("⏳ Evolución del Balance")
+            st.subheader("Evolución del Balance")
             try:
                 bs_t = (ticker_data.balance_sheet.transpose()
                                         .apply(pd.to_numeric, errors="coerce"))
@@ -975,12 +975,12 @@ with tabs[0]:
 
             # BLOQUE 5: Análisis Fundamental - Estado de Resultados
         # ==========================
-        with st.expander(f"📝 Análisis Fundamental - Estado de Resultados de {ticker_input}"):
+        with st.expander(f"Análisis Fundamental - Estado de Resultados de {ticker_input}"):
 
             # ------------------------------------------------------------------
             # 5-A  Ingresos
             # ------------------------------------------------------------------
-            st.subheader("📝 Evolución de los Ingresos")
+            st.subheader("Evolución de los Ingresos")
             try:
                 income = (ticker_data.financials.transpose()
                                         .apply(pd.to_numeric, errors="coerce")
@@ -1024,7 +1024,7 @@ with tabs[0]:
             # ------------------------------------------------------------------
             # 5-B  Márgenes
             # ------------------------------------------------------------------
-            st.subheader("📝 Evolución de Márgenes")
+            st.subheader("Evolución de Márgenes")
             try:
                 ingresos = income.get("Total Revenue")
                 if ingresos is None:
@@ -1065,7 +1065,7 @@ with tabs[0]:
             # ------------------------------------------------------------------
             # 5-C  EPS
             # ------------------------------------------------------------------
-            st.subheader("⏳ Evolución del EPS")
+            st.subheader("Evolución del EPS")
             try:
                 if eps_actual is not None:
                     st.subheader(f"📌 El EPS actual es de ${eps_actual:.2f}")
@@ -1095,7 +1095,7 @@ with tabs[0]:
             # ------------------------------------------------------------------
             # 5-D  Acciones en circulación
             # ------------------------------------------------------------------
-            st.subheader("🔄 Evolución de Acciones en Circulación")
+            st.subheader("Evolución de Acciones en Circulación")
             try:
                 bs = ticker_data.balance_sheet
                 if "Ordinary Shares Number" not in bs.index:
@@ -1135,7 +1135,7 @@ with tabs[0]:
         # ==========================
         # BLOQUE 6: Estado de Flujo de Efectivo
         # ==========================
-        with st.expander(f"💵 Análisis Fundamental - Estado de Flujo de Efectivo de {ticker_input}"):
+        with st.expander(f"Análisis Fundamental - Estado de Flujo de Efectivo de {ticker_input}"):
 
             # ------------------------------------------------------------------
             # 6-A  Pre-procesamiento del Cash-Flow
@@ -1152,7 +1152,7 @@ with tabs[0]:
             # ------------------------------------------------------------------
             # 6-B  Operating CF, CapEx y FCF (%)
             # ------------------------------------------------------------------
-            st.subheader("🛒 Flujo de Caja: Operating CF, CaPex y FCF (%)")
+            st.subheader("Flujo de Caja: Operating CF, CaPex y FCF (%)")
             try:
                 if {"Operating Cash Flow", "Capital Expenditure"} <= set(cf.columns):
                     op_cf  = cf["Operating Cash Flow"].dropna()
@@ -1234,12 +1234,12 @@ with tabs[0]:
                     st.plotly_chart(fig_issuance, use_container_width=True, key="plotly_chart_issuance")
 
             # Pago
-            st.subheader("🏛️ Pago de Deuda")
+            st.subheader("Pago de Deuda")
             barra_simple(cf_t.get("Repayment Of Debt"), "Pago de Deuda",
                         primary_orange, "plotly_chart_repayment")
 
             # Recompra
-            st.subheader("♻️ Recompra de Acciones")
+            st.subheader("Recompra de Acciones")
             barra_simple(cf_t.get("Repurchase Of Capital Stock"), "Recompra de Acciones",
                         primary_pink, "plotly_chart_repurchase")
 
@@ -1293,9 +1293,9 @@ with tabs[0]:
         else:
                 valor_infravalorado = None
                         
-        key_cols[1].metric("💎 Precio Infrav. G. Weiss", f"${valor_infravalorado:.2f}" if valor_infravalorado is not None else "N/A")
-        key_cols[2].metric("📊 Valor Libro Precio Justo", f"${fair_price:.2f}" if fair_price is not None else "N/A")
-        key_cols[3].metric("🚀 Precio a PER 5 años", f"${per_5y:.2f}" if per_5y is not None else "N/A")
+        key_cols[1].metric("Precio Infrav. G. Weiss", f"${valor_infravalorado:.2f}" if valor_infravalorado is not None else "N/A")
+        key_cols[2].metric("Valor Libro Precio Justo", f"${fair_price:.2f}" if fair_price is not None else "N/A")
+        key_cols[3].metric("Precio a PER 5 años", f"${per_5y:.2f}" if per_5y is not None else "N/A")
                         
                 # Ahora, en esta misma sección se solicita el Yield Deseado
         yield_deseado_obj = st.number_input("Ingrese Aquí el Yield Deseado (%)", min_value=0.1, value=3.0, step=0.1, key="yield_deseado_objetivo")
@@ -1304,7 +1304,7 @@ with tabs[0]:
                 # (Dividendo Actual * (1 + (CAGR del Dividendo)/100)) / (Yield Deseado/100)
         fair_div_price = (dividend * (1 + (cagr_dividend/100))) / (yield_deseado_obj/100) if (dividend is not None and cagr_dividend is not None and yield_deseado_obj != 0) else None
                         
-        st.metric("⌛ Precio por Dividendo Esperado", f"${fair_div_price:.2f}" if fair_div_price is not None else "N/A")
+        st.metric("Precio por Dividendo Esperado", f"${fair_div_price:.2f}" if fair_div_price is not None else "N/A")
                         
                 # --------------------------
                 # Datos Relevantes (tabla)
@@ -1326,7 +1326,7 @@ with tabs[0]:
                             "Yield Promedio": f"{avg_yield:.2f}%" if avg_yield is not None else "N/A"
                         }
         df_otros = pd.DataFrame.from_dict(otros_datos, orient='index', columns=["Valor"])
-        st.markdown("### 👨‍💻 Datos Relevantes")
+        st.markdown("###Datos Relevantes")
         st.dataframe(df_otros)
         st.subheader("")
 

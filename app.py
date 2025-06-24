@@ -569,8 +569,10 @@ with tabs[0]:
             st.subheader("💵 Evolución de la Deuda")
             try:
                 # Balance y Cash-Flow convertidos a float
-                bs = (ticker_data.balance_sheet.transpose()
-                                    .apply(pd.to_numeric, errors="coerce"))
+                bs = (
+                    ticker_data.balance_sheet.transpose()
+                    .apply(pd.to_numeric, errors="coerce")
+                )
                 bs.index = bs.index.year
 
                 cf = (ticker_data.cashflow.transpose()
@@ -591,7 +593,11 @@ with tabs[0]:
                     "Deuda Neta":   (total_debt - cash) if total_debt is not None and cash is not None else None
                 }).dropna(how="all")
 
-                if not df_deuda.empty and "FCF" in df_deuda and "Deuda Neta" in df_deuda:
+                if (
+                    not df_deuda.empty
+                    and "FCF" in df_deuda.columns
+                    and "Deuda Neta" in df_deuda.columns
+                ):
                     df_deuda["Deuda Neta/FCF"] = df_deuda["Deuda Neta"] / df_deuda["FCF"]
                     df_deuda = df_deuda.replace([np.inf, -np.inf], np.nan).dropna()
 
@@ -711,21 +717,25 @@ with tabs[0]:
                 }).dropna(how="all")
 
                 # EV/EBITDA actual (último año)
-                current_ev_ebitda = df_ev["EV/EBITDA"].dropna().iloc[-1] if "EV/EBITDA" in df_ev and not df_ev["EV/EBITDA"].dropna().empty else None
+                current_ev_ebitda = (
+                    df_ev["EV/EBITDA"].dropna().iloc[-1]
+                    if "EV/EBITDA" in df_ev.columns and not df_ev["EV/EBITDA"].dropna().empty
+                    else None
+                )
                 st.subheader(f"📌 EV/EBITDA actual: {current_ev_ebitda:.2f}" if current_ev_ebitda is not None else "EV/EBITDA actual no disponible")
 
                 fig_ev = go.Figure()
-                if "EBITDA" in df_ev:
+                if "EBITDA" in df_ev.columns:
                     fig_ev.add_trace(go.Bar(
                         x=df_ev.index, y=df_ev["EBITDA"],
                         name="EBITDA", marker_color=primary_orange,
                         text=df_ev["EBITDA"].round(0), textposition="outside"))
-                if "EV" in df_ev:
+                if "EV" in df_ev.columns:
                     fig_ev.add_trace(go.Bar(
                         x=df_ev.index, y=df_ev["EV"],
                         name="EV", marker_color=primary_blue,
                         text=df_ev["EV"].round(0), textposition="outside"))
-                if "EV/EBITDA" in df_ev:
+                if "EV/EBITDA" in df_ev.columns:
                     fig_ev.add_trace(go.Scatter(
                         x=df_ev.index, y=df_ev["EV/EBITDA"],
                         name="EV/EBITDA", mode="lines+markers+text",

@@ -1,11 +1,15 @@
-from . import ui
-from .services.yf_client import safe_history
+import streamlit as st
 
+st.set_page_config(
+    page_title="Plataforma de Análisis",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+from . import ui   # debe ir DESPUÉS del set_page_config
 
 def main():
-    # App logic lives inside ui module; importing it runs the Streamlit app
-    pass
-
+    ui.render()
 
 if __name__ == "__main__":
     main()

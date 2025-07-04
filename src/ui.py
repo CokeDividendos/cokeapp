@@ -8,12 +8,6 @@ from .services.yf_client import YF_SESSION, safe_history, history_resiliente, ge
 from .services.cache import cache_data
 
 # ───── 1-A  page config (¡debe ser la PRIMERA llamada st.*!) ──────────────────
-st.set_page_config(
-    page_title="Plataforma de Análisis",
-    page_icon="🧮",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
 
 # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
 st.markdown(

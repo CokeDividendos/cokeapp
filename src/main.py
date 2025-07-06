@@ -6,10 +6,15 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-from . import ui   # debe ir DESPUÉS del set_page_config
+
+# ⬇️  Solo importamos; NO llamamos a ui.render()
+from . import ui
+
 
 def main():
-    ui.render()
+    # El pass evita error si Streamlit ejecuta main()
+    pass
+
 
 if __name__ == "__main__":
     main()

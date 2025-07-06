@@ -8,9 +8,9 @@ from .services.yf_client import YF_SESSION, safe_history, history_resiliente, ge
 from .services.cache import cache_data
 
 
-# ─── Stub temporal: evita AttributeError si alguien llama ui.render() ───
+# --- stub para evitar AttributeError si alguien llama ui.render() ---
 def render():
-    """Placeholder: será reemplazada o eliminada más adelante."""
+    """Placeholder (no hace nada).  Será sustituido más adelante."""
     pass
 
 # ───── 1-A  page config (¡debe ser la PRIMERA llamada st.*!) ──────────────────

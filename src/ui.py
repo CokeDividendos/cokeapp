@@ -10,7 +10,7 @@ def render():
      # ───── 1-A  page config (¡debe ser la PRIMERA llamada st.*!) ──────────────────
     
      # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
-     st.markdown(
+    st.markdown(
         """
         <style>
         html, body, [class*="css"]{font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}

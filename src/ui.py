@@ -7,6 +7,12 @@ import yfinance as yf
 from .services.yf_client import YF_SESSION, safe_history, history_resiliente, get_logo_url
 from .services.cache import cache_data
 
+
+# ─── Stub temporal: evita AttributeError si alguien llama ui.render() ───
+def render():
+    """Placeholder: será reemplazada o eliminada más adelante."""
+    pass
+
 # ───── 1-A  page config (¡debe ser la PRIMERA llamada st.*!) ──────────────────
 
 # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────

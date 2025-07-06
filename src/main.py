@@ -4,8 +4,9 @@ st.set_page_config(page_title="Plataforma de Análisis",
                    layout="wide",
                    initial_sidebar_state="collapsed")
 from . import ui   # solo importamos, sin llamar nada
+
 def main():
-    pass
+    ui.render()
 
 if __name__ == "__main__":
     main()

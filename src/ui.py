@@ -9,8 +9,8 @@ from .services.cache import cache_data
 def render():
      # ───── 1-A  page config (¡debe ser la PRIMERA llamada st.*!) ──────────────────
     
-    # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
-    st.markdown(
+     # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
+     st.markdown(
         """
         <style>
         html, body, [class*="css"]{font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
@@ -170,11 +170,11 @@ def render():
                annual_dividends.index = annual_dividends.index.year
                start_year, end_year = price_data.index[[0,-1]].year
   
-                if len(annual_dividends) >= 3:
+               if len(annual_dividends) >= 3:
                     first, penultimate = annual_dividends.iloc[[0,-2]]
                     n_years            = annual_dividends.index[-2] - annual_dividends.index[0]
                     cagr_dividend      = ( (penultimate/first)**(1/n_years) - 1 ) * 100
-                else:
+               else:
                     cagr_dividend = None
     
                     df_yield = price_data[['Close']].assign(
@@ -1237,30 +1237,29 @@ def render():
                             
             st.metric("Precio por Dividendo Esperado", f"${fair_div_price:.2f}" if fair_div_price is not None else "N/A")
                             
-                    # --------------------------
-                    # Datos Relevantes (tabla)
-                    # --------------------------
-            otros_datos = {
-                                "ROE Actual": f"{roe_actual*100:.2f}%" if roe_actual is not None else "N/A",
-                                "PayOut": f"{payout_ratio*100:.2f}%" if payout_ratio is not None else "N/A",
-                                "EPS Actual": f"${eps_actual:.2f}" if eps_actual is not None else "N/A",
-                                "PER": f"{pe_ratio:.2f}" if pe_ratio is not None else "N/A",
-                                "P/B": f"{pb:.2f}" if pb is not None else "N/A",
-                                "Book/Share": f"${book_per_share:.2f}" if book_per_share is not None else "N/A",
-                                "G": f"{G_percent:.2f}%" if G_percent is not None else "N/A",
-                                "Múltiplo Crecimiento": f"{multiplier}" if multiplier is not None else "N/A",
-                                "EPS a 5 años": f"${eps_5y:.2f}" if eps_5y is not None else "N/A",
-                                "G esperado": f"{g_esperado_percent:.2f}%" if g_esperado_percent is not None else "N/A",
-                                "Dividendo Anual": f"${dividend:.2f}" if dividend is not None else "N/A",
-                                "Yield Actual": f"{yield_actual:.2f}%" if yield_actual is not None else "N/A",
-                                "CAGR del Dividendo": f"{cagr_dividend:.2f}%" if cagr_dividend is not None else "N/A",
-                                "Yield Promedio": f"{avg_yield:.2f}%" if avg_yield is not None else "N/A"
-                            }
-            df_otros = pd.DataFrame.from_dict(otros_datos, orient='index', columns=["Valor"])
-            st.markdown("###Datos Relevantes")
-            st.dataframe(df_otros)
-            st.subheader("")
+# --------------------------
+# Datos Relevantes (tabla)
+# --------------------------
+otros_datos = {
+               "ROE Actual": f"{roe_actual*100:.2f}%" if roe_actual is not None else "N/A",
+               "PayOut": f"{payout_ratio*100:.2f}%" if payout_ratio is not None else "N/A",
+               "EPS Actual": f"${eps_actual:.2f}" if eps_actual is not None else "N/A",
+               "PER": f"{pe_ratio:.2f}" if pe_ratio is not None else "N/A",
+               "P/B": f"{pb:.2f}" if pb is not None else "N/A",
+               "Book/Share": f"${book_per_share:.2f}" if book_per_share is not None else "N/A",
+               "G": f"{G_percent:.2f}%" if G_percent is not None else "N/A",
+               "Múltiplo Crecimiento": f"{multiplier}" if multiplier is not None else "N/A",
+               "EPS a 5 años": f"${eps_5y:.2f}" if eps_5y is not None else "N/A",
+               "G esperado": f"{g_esperado_percent:.2f}%" if g_esperado_percent is not None else "N/A",
+               "Dividendo Anual": f"${dividend:.2f}" if dividend is not None else "N/A",
+               "Yield Actual": f"{yield_actual:.2f}%" if yield_actual is not None else "N/A",
+               "CAGR del Dividendo": f"{cagr_dividend:.2f}%" if cagr_dividend is not None else "N/A",
+               "Yield Promedio": f"{avg_yield:.2f}%" if avg_yield is not None else "N/A"
+               }
+          df_otros = pd.DataFrame.from_dict(otros_datos, orient='index', columns=["Valor"])
+          st.markdown("###Datos Relevantes")
+          st.dataframe(df_otros)
+          st.subheader("")
     
-    
-        except Exception as e: 
-            st.error(f"Ocurrió un error al obtener los datos: {e}")
+    except Exception as e: 
+          st.error(f"Ocurrió un error al obtener los datos: {e}")

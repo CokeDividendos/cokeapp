@@ -1,18 +1,9 @@
-import streamlit as st
-
-st.set_page_config(
-    page_title="Plataforma de Análisis",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
-
-# ⬇️  Solo importamos; NO llamamos a ui.render()
 from . import ui
+from .services.yf_client import safe_history
 
 
 def main():
-    # El pass evita error si Streamlit ejecuta main()
+    # App logic lives inside ui module; importing it runs the Streamlit app
     pass
 
 

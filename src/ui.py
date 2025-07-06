@@ -164,21 +164,21 @@ def render():
             # ─── CAGR del dividendo ─────────────────────────────────────
             dividends = ticker_data.dividends
             if not dividends.empty:
-                annual_dividends = (dividends.resample('Y').sum()
+               annual_dividends = (dividends.resample('Y').sum()
                                             .astype(float)
                                             .dropna())
-                annual_dividends.index = annual_dividends.index.year
-                 start_year, end_year = price_data.index[[0,-1]].year
+               annual_dividends.index = annual_dividends.index.year
+               start_year, end_year = price_data.index[[0,-1]].year
   
                 if len(annual_dividends) >= 3:
-                     first, penultimate = annual_dividends.iloc[[0,-2]]
+                    first, penultimate = annual_dividends.iloc[[0,-2]]
                     n_years            = annual_dividends.index[-2] - annual_dividends.index[0]
                     cagr_dividend      = ( (penultimate/first)**(1/n_years) - 1 ) * 100
                 else:
-                 cagr_dividend = None
+                    cagr_dividend = None
     
-                df_yield = price_data[['Close']].assign(
-                    Año            = price_data.index.year,
+                    df_yield = price_data[['Close']].assign(
+                         Año            = price_data.index.year,
                     Dividendo_Anual= price_data.index.year.map(annual_dividends.to_dict())
                 )
                 df_yield['Yield (%)'] = (df_yield['Dividendo_Anual']/df_yield['Close'])*100

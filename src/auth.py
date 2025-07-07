@@ -16,7 +16,7 @@ oauth2 = OAuth2Component(
 
 
 def login_required() -> bool:
-    """Return True once the user logs in with Google."""
+    """Return True once the user logs in with Google and has a Gmail account."""
     if "user" in st.session_state:
         return True
 
@@ -56,14 +56,21 @@ def login_required() -> bool:
             "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",
             width=64,
         )
-        st.markdown("<h4>Accede con tu cuenta Google</h4>", unsafe_allow_html=True)
+        # Mensaje aclarando que solo cuentas Gmail son aceptadas
+        st.markdown("<h4>Accede con tu cuenta Gmail (@gmail.com)</h4>", unsafe_allow_html=True)
         result = oauth2.authorize_button(
             "Iniciar sesión con Google", key="google_login"
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
     if result and "token" in result:
-        email = result["token"]["email"]
+        email = result["token"].get("email")
+        if not email:
+            st.error("No se pudo obtener el correo electrónico. Por favor, intenta con otra cuenta de Google.")
+            st.stop()
+        if not email.endswith("@gmail.com"):
+            st.error("Solo se permiten cuentas de Gmail (@gmail.com) para registrarse e ingresar.")
+            st.stop()
         upsert_user(email=email)
         st.session_state["user"] = get_user(email)
         return True

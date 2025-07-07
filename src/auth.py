@@ -31,45 +31,69 @@ def login_required() -> bool:
     if "user" in st.session_state:
         return True
 
-    # --- estilos -----------------------------------------------------------------
+    # ── 1. estilos generales ───────────────────────────────────────────────
     st.markdown(
         """
         <style>
-        /* cuerpo pantalla de login */
+        /* centrar el contenido mientras no haya sesión */
         div[data-testid="stAppViewContainer"] > .main {
-            display:flex;
-            align-items:center;
-            justify-content:center;
+            display:flex;                  /* flexbox */
+            align-items:center;            /* centra vertical */
+            justify-content:center;        /* centra horizontal */
         }
         /* tarjeta */
-        .login-card {
-            padding:2rem 3rem;
-            background:#FFFFFF10;            /* semi-transparente sobre tema oscuro */
-            border:1px solid #FFFFFF22;
-            border-radius:12px;
-            box-shadow:0 4px 15px rgba(0,0,0,.25);
-            backdrop-filter:blur(6px);
+        .login-card{
+            width:320px;
+            padding:2rem 2.5rem 2.2rem;
+            border-radius:14px;
+            background:rgba(255,255,255,0.06);
+            border:1px solid rgba(255,255,255,0.15);
+            box-shadow:0 6px 18px rgba(0,0,0,0.30);
+            backdrop-filter:blur(8px);
             text-align:center;
+        }
+        .login-card img{
+            width:56px;
+            margin-bottom:0.8rem;
+        }
+        .login-card h4{
+            font-weight:600;
+            margin:0 0 1.4rem;
+            font-size:1.05rem;
+        }
+        /* botón de Google tiene su propio iframe; reforzamos el ancho  */
+        iframe[title="streamlit_oauth.authorize_button"]{
+            min-width:260px!important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
+    # ── 2. maquetado ────────────────────────────────────────────────────────
     with st.container():
         st.markdown("<div class='login-card'>", unsafe_allow_html=True)
 
-        st.markdown("### Accede con tu cuenta de Google")
+        # logo Google (SVG ligero incrustado)
+        st.markdown(
+            """
+            <img src="https://upload.wikimedia.org/wikipedia/commons/4/4a/Logo_2013_Google.png" />
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("<h4>Accede con tu cuenta Google</h4>", unsafe_allow_html=True)
 
         result = oauth2.authorize_button(
             "Iniciar sesión con Google",
-            "https://cokeapp.streamlit.app",
-            "openid email profile",
+            "https://cokeapp.streamlit.app",   # redirect_uri
+            "openid email profile",            # scope
             key="google_login",
         )
 
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # ── 3. si llega el token, se guarda usuario y se continúa ──────────────
     if result and "token" in result:
         email = result["token"]["email"]
         upsert_user(email=email)
@@ -77,6 +101,7 @@ def login_required() -> bool:
         return True
 
     st.stop()
+
 
 
 # auth.py  ── dentro de login_required()  ─────────────────────────────

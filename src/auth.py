@@ -75,7 +75,7 @@ def login_required() -> bool:
         return True
 
     st.stop()
-
+    
 def logout_button() -> None:
     """Render a logout button in the sidebar."""
     if st.sidebar.button("Cerrar sesión"):

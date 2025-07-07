@@ -169,6 +169,11 @@ def guardar_api_key_free(api_key):
     if user and user[3] == "free":
         from .db import set_user_api_key
         set_user_api_key(user[1], api_key)
-        # Refresca el user_db actualizado
         from .db import get_user_by_email
         st.session_state["user_db"] = get_user_by_email(user[1])
+
+def logout_button():
+    if "user" in st.session_state:
+        if st.button("Cerrar sesión", key="logout_btn"):
+            st.session_state.clear()
+            st.experimental_rerun()

@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_authenticator.google_authenticator import GoogleAuthenticator as stauth
+from streamlit_authenticator import GoogleAuthenticator as stauth
 
 from .db import get_user, upsert_user
 

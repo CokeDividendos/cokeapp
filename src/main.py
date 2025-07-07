@@ -1,14 +1,20 @@
 import streamlit as st
-st.set_page_config(page_title="Plataforma de Análisis",
-                   page_icon="📈",
-                   layout="wide",
-                   initial_sidebar_state="collapsed")
-from . import ui   # solo importamos, sin llamar nada
-from .auth import login_required
+
+st.set_page_config(
+    page_title="Plataforma de Análisis",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+from . import ui  # solo importamos, sin llamar nada
+from .auth import login_required, logout_button
+
 
 def main():
     if login_required():
+        logout_button()
         ui.render()
+
 
 if __name__ == "__main__":
     main()

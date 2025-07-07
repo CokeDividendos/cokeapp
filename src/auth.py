@@ -40,6 +40,14 @@ def login_required() -> bool:
 
     st.stop()
 
+# auth.py  ── dentro de login_required()  ─────────────────────────────
+
+result = oauth2.authorize_button(
+    "Iniciar sesión con Google",          # label
+    "https://cokeapp.streamlit.app",      # redirect_uri  (la misma del constructor)
+    "openid email profile",               # scope
+    key="google_login",
+)
 
 def logout_button() -> None:
     """Botón de cierre de sesión en la barra lateral."""

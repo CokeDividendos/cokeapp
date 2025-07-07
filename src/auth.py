@@ -21,11 +21,26 @@ def login_required():
         "https://www.googleapis.com/auth/userinfo.email"
     ]
 
+    # Ya está logueado
     if "google_token" in st.session_state and "user" in st.session_state:
         return True
 
     query_params = st.query_params
     if "code" not in query_params:
+        # --- LOGIN UI PERSONALIZADO ---
+        st.markdown(
+            """
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+            <div style="text-align:center; margin-top:48px;">
+                <img src="https://i.imgur.com/aznQh7O.png" width="96" style="border-radius:24px;box-shadow:0 2px 8px #ff880033;">
+                <h2 style="color:#223354;font-family:'Inter',sans-serif;margin-top:16px;">Bienvenido a <span style="color:#FF8800;">CokeApp</span></h2>
+                <p style="color:#6B778C;font-size:1.12em;margin-bottom:36px;">
+                    Plataforma profesional para análisis financiero y seguimiento de inversiones.
+                </p>
+            </div>
+            """, unsafe_allow_html=True
+        )
+
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -46,8 +61,27 @@ def login_required():
         )
         st.markdown(
             f"""
-            <div style="display:flex;justify-content:center;margin-top:64px">
-              <a href="{auth_url}"><button style="font-size:1.2rem;padding:0.8em 2em">Iniciar sesión con Google</button></a>
+            <div style="display:flex;justify-content:center;margin-top:32px">
+              <a href="{auth_url}">
+                <button style="
+                    font-size:1.15rem;
+                    padding:0.85em 2.2em;
+                    background:#FF8800;
+                    color:#fff;
+                    border:none;
+                    border-radius:10px;
+                    font-family:'Inter',sans-serif;
+                    font-weight:600;
+                    box-shadow:0 2px 8px #ff880033;
+                    cursor:pointer;
+                    transition:background .14s;
+                " 
+                onmouseover="this.style.background='#de6a00';"
+                onmouseout="this.style.background='#FF8800';"
+                >
+                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" width="24" style="vertical-align:middle;margin-right:10px;margin-bottom:4px">Iniciar sesión con Google
+                </button>
+              </a>
             </div>
             """,
             unsafe_allow_html=True,
@@ -73,6 +107,7 @@ def login_required():
         flow.fetch_token(code=code)
         credentials = flow.credentials
 
+        # Obtener datos usuario
         resp = requests.get(
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {credentials.token}"},

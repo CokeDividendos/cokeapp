@@ -9,15 +9,21 @@ CLIENT_SECRET = st.secrets["google"]["client_secret"]
 
 
 # ── Componente de login con Google ────────────────────────────────────────────
-oauth2 = OAuth2Component(
-    client_id=CLIENT_ID,
-    client_secret=CLIENT_SECRET,
-    auth_url="https://accounts.google.com/o/oauth2/auth",     # nombre correcto
-    token_url="https://oauth2.googleapis.com/token",          # nombre correcto
-    redirect_uri="https://cokeapp.streamlit.app",             # debe coincidir con GCP
-    scope="openid email profile",
-)
+import streamlit as st
+from streamlit_oauth import OAuth2Component
+from .db import get_user, upsert_user
 
+CLIENT_ID = st.secrets["google"]["client_id"]
+CLIENT_SECRET = st.secrets["google"]["client_secret"]
+
+oauth2 = OAuth2Component(
+    CLIENT_ID,
+    CLIENT_SECRET,
+    "https://accounts.google.com/o/oauth2/auth",   # authorize_url
+    "https://oauth2.googleapis.com/token",        # token_url
+    "https://cokeapp.streamlit.app",              # redirect_uri  (registrado en GCP)
+    "openid email profile",                       # scope (string!)
+)
 
 # ── Helpers de sesión ─────────────────────────────────────────────────────────
 def login_required() -> bool:

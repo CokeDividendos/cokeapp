@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_authenticator import GoogleAuthenticator as stauth
+from streamlit_authenticator.google_authenticator import GoogleAuthenticator
 
 from .db import get_user, upsert_user
 
@@ -10,9 +10,10 @@ _authenticator = None
 def _get_authenticator():
     global _authenticator
     if _authenticator is None:
-        _authenticator = stauth(
-            st.secrets["google"]["client_id"],
-            st.secrets["google"]["client_secret"],
+        _authenticator = GoogleAuthenticator(
+            name="Coke Dividendos App",
+            client_id=st.secrets["google"]["client_id"],
+            client_secret=st.secrets["google"]["client_secret"],
         )
     return _authenticator
 

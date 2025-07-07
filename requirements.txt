@@ -8,5 +8,5 @@ requests-cache>=1.2
 streamlit-authenticator>=0.2.3
 PyYAML>=5.4
 rich<14
-google-auth==2.0.0
-google-auth-oauthlib==1.2.0
+google-auth>=2.15.0
+google-auth-oauthlib>=1.2.0

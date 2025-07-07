@@ -6,14 +6,13 @@ _CLIENT_ID = st.secrets["google"]["client_id"]
 _CLIENT_SECRET = st.secrets["google"]["client_secret"]
 
 oauth2 = OAuth2Component(
-    _CLIENT_ID,
-    _CLIENT_SECRET,
+    client_id=_CLIENT_ID,
+    client_secret=_CLIENT_SECRET,
     authorize_url="https://accounts.google.com/o/oauth2/auth",
     token_url="https://oauth2.googleapis.com/token",
     redirect_url="https://cokeapp.streamlit.app/",
     scope="https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
 )
-
 
 def login_required() -> bool:
     """Return True once the user logs in with Google and has a Gmail account."""
@@ -56,7 +55,6 @@ def login_required() -> bool:
             "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",
             width=64,
         )
-        # Mensaje aclarando que solo cuentas Gmail son aceptadas
         st.markdown("<h4>Accede con tu cuenta Gmail (@gmail.com)</h4>", unsafe_allow_html=True)
         result = oauth2.authorize_button(
             "Iniciar sesión con Google", key="google_login"
@@ -76,7 +74,6 @@ def login_required() -> bool:
         return True
 
     st.stop()
-
 
 def logout_button() -> None:
     """Render a logout button in the sidebar."""

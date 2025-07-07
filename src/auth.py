@@ -25,17 +25,50 @@ oauth2 = OAuth2Component(
     "openid email profile",                       # scope (string!)
 )
 
+# src/auth.py  – dentro de login_required()
+
 def login_required() -> bool:
-    """Muestra el botón Google hasta que el usuario esté autenticado."""
     if "user" in st.session_state:
         return True
 
-    result = oauth2.authorize_button(
-        "Iniciar sesión con Google",              # label
-        "https://cokeapp.streamlit.app",          # redirect_uri
-        "openid email profile",                   # scope
-        key="google_login",
+    # --- estilos -----------------------------------------------------------------
+    st.markdown(
+        """
+        <style>
+        /* cuerpo pantalla de login */
+        div[data-testid="stAppViewContainer"] > .main {
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+        /* tarjeta */
+        .login-card {
+            padding:2rem 3rem;
+            background:#FFFFFF10;            /* semi-transparente sobre tema oscuro */
+            border:1px solid #FFFFFF22;
+            border-radius:12px;
+            box-shadow:0 4px 15px rgba(0,0,0,.25);
+            backdrop-filter:blur(6px);
+            text-align:center;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
+
+    with st.container():
+        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
+
+        st.markdown("### Accede con tu cuenta de Google")
+
+        result = oauth2.authorize_button(
+            "Iniciar sesión con Google",
+            "https://cokeapp.streamlit.app",
+            "openid email profile",
+            key="google_login",
+        )
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if result and "token" in result:
         email = result["token"]["email"]
@@ -44,6 +77,7 @@ def login_required() -> bool:
         return True
 
     st.stop()
+
 
 # auth.py  ── dentro de login_required()  ─────────────────────────────
 

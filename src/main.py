@@ -1,20 +1,9 @@
-import streamlit as st
-
-st.set_page_config(
-    page_title="Plataforma de Análisis",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
-from . import ui  # solo importamos, sin llamar nada
 from .auth import login_required, logout_button
-
+import streamlit as st
 
 def main():
     if login_required():
         logout_button()
-        ui.render()
-
-
-if __name__ == "__main__":
-    main()
+        st.title("Bienvenido a CokeApp")
+        st.write(f"¡Hola, {st.session_state['user']}!")
+        # Aquí tu UI principal

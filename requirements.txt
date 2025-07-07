@@ -5,4 +5,4 @@ numpy>=1.26
 tenacity>=8.2
 plotly>=5.21
 requests-cache>=1.2
-streamlit-authenticator==0.3.3
+streamlit-authenticator>=0.4.0

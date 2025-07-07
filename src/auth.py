@@ -5,7 +5,7 @@ from .db import get_user, upsert_user
 _CLIENT_ID = st.secrets["google"]["client_id"]
 _CLIENT_SECRET = st.secrets["google"]["client_secret"]
 
-# Solo client_id y client_secret en el constructor
+# SOLO client_id y client_secret en el constructor
 oauth2 = OAuth2Component(_CLIENT_ID, _CLIENT_SECRET)
 
 def login_required() -> bool:
@@ -51,12 +51,9 @@ def login_required() -> bool:
         width=64,
     )
     st.markdown("<h4>Accede con tu cuenta Gmail (@gmail.com)</h4>", unsafe_allow_html=True)
+    # SOLO texto y key en el botón
     result = oauth2.authorize_button(
         "Iniciar sesión con Google",
-        authorize_url="https://accounts.google.com/o/oauth2/auth",
-        token_url="https://oauth2.googleapis.com/token",
-        redirect_url="https://cokeapp.streamlit.app",
-        scope="https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
         key="google_login"
     )
     st.markdown("</div></div>", unsafe_allow_html=True)

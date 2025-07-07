@@ -263,7 +263,7 @@ def render():
             fig = go.Figure()
             fig.add_trace(
                 go.Scatter(
-                    x=price_data.index, y=price_data["Close"], mode="lines", name="Close", line=dict(color=darkorange)
+                    x=price_data.index, y=price_data["Close"], mode="lines", name="Close", line=dict(color="darkorange")
                 )
             )
             fig.update_layout(

@@ -3,21 +3,27 @@ from google_auth_oauthlib.flow import Flow
 import requests
 
 def login_required():
-    # Leer credenciales de Streamlit Secrets
-    client_id = st.secrets["google"]["client_id"]
-    client_secret = st.secrets["google"]["client_secret"]
-    redirect_uri = st.secrets["google"]["redirect_uri"]
+    # Comprobación robusta de secrets
+    if "google" not in st.secrets:
+        st.error("No se encontró la sección [google] en los secrets de Streamlit Cloud.")
+        st.stop()
+    google_secrets = st.secrets["google"]
+    for key in ("client_id", "client_secret", "redirect_uri"):
+        if key not in google_secrets:
+            st.error(f"Falta '{key}' en secrets. Por favor, revisa en Settings > Secrets de Streamlit Cloud.")
+            st.stop()
+    client_id = google_secrets["client_id"]
+    client_secret = google_secrets["client_secret"]
+    redirect_uri = google_secrets["redirect_uri"]
     scopes = [
         "openid",
         "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/userinfo.email"
     ]
 
-    # Si ya está autenticado
     if "google_token" in st.session_state and "user" in st.session_state:
         return True
 
-    # Si no, inicia flujo OAuth
     query_params = st.query_params
     if "code" not in query_params:
         flow = Flow.from_client_config(
@@ -48,7 +54,6 @@ def login_required():
         )
         st.stop()
     else:
-        # Intercambia 'code' por token
         code = query_params["code"]
         if isinstance(code, list):
             code = code[0]
@@ -68,7 +73,6 @@ def login_required():
         flow.fetch_token(code=code)
         credentials = flow.credentials
 
-        # Obtén email del usuario
         resp = requests.get(
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {credentials.token}"},
@@ -78,7 +82,6 @@ def login_required():
         st.session_state["google_token"] = credentials.token
         st.session_state["user"] = email
 
-        # Limpia la URL para ocultar el 'code'
         st.query_params.clear()
         st.experimental_rerun()
 

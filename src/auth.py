@@ -52,17 +52,14 @@ def login_required() -> bool:
         width=64,
     )
     st.markdown("<h4>Accede con tu cuenta Gmail (@gmail.com)</h4>", unsafe_allow_html=True)
-    # El botón debe ir aquí dentro:
     result = oauth2.authorize_button(
         "Iniciar sesión con Google",
         authorize_url="https://accounts.google.com/o/oauth2/auth",
         token_url="https://oauth2.googleapis.com/token",
-        redirect_url="https://cokeapp.streamlit.app",  # <-- asegúrate que coincide con Google Cloud
+        redirect_url="https://cokeapp.streamlit.app",  # <- igual que en Google Cloud
         scope="https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
-        # Si da error, prueba quitando "key"
         key="google_login"
     )
-    # Cierra el div
     st.markdown("</div></div>", unsafe_allow_html=True)
 
     if result and "token" in result:

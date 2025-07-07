@@ -1,9 +1,12 @@
 import streamlit as st
 from google_auth_oauthlib.flow import Flow
 import requests
+from .db import init_db, get_user_by_email, update_user_plan, set_user_api_key
+import datetime
+
+init_db()
 
 def login_required():
-    # Comprobación robusta de secrets
     if "google" not in st.secrets:
         st.error("No se encontró la sección [google] en los secrets de Streamlit Cloud.")
         st.stop()
@@ -20,14 +23,14 @@ def login_required():
         "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/userinfo.email"
     ]
-
-    # Ya está logueado
     if "google_token" in st.session_state and "user" in st.session_state:
+        email = st.session_state["user"]
+        user = get_user_by_email(email)
+        st.session_state["user_db"] = user
         return True
 
     query_params = st.query_params
     if "code" not in query_params:
-        # --- LOGIN UI PERSONALIZADO ---
         st.markdown(
             """
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -40,7 +43,6 @@ def login_required():
             </div>
             """, unsafe_allow_html=True
         )
-
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -107,20 +109,46 @@ def login_required():
         flow.fetch_token(code=code)
         credentials = flow.credentials
 
-        # Obtener datos usuario
         resp = requests.get(
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {credentials.token}"},
         )
         user_info = resp.json()
         email = user_info.get("email")
+        nombre = user_info.get("name", "")
+        # Sincroniza con SQLite
+        user = get_user_by_email(email)
+        if not user:
+            from .db import sqlite3, DB_PATH
+            conn = sqlite3.connect(DB_PATH)
+            cur = conn.cursor()
+            cur.execute("INSERT INTO usuarios (email, nombre) VALUES (?, ?)", (email, nombre))
+            conn.commit()
+            conn.close()
+            user = get_user_by_email(email)
         st.session_state["google_token"] = credentials.token
         st.session_state["user"] = email
-
+        st.session_state["user_db"] = user
         st.query_params.clear()
         st.experimental_rerun()
-
     return True
+
+def is_admin():
+    user = st.session_state.get("user_db")
+    return user and user[3] == "admin"  # tipo_plan columna 3
+
+def is_premium():
+    user = st.session_state.get("user_db")
+    if user and user[3] == "premium":
+        exp = user[5]
+        if exp:
+            return exp > str(datetime.date.today())
+        return True
+    return False
+
+def is_free():
+    user = st.session_state.get("user_db")
+    return user and user[3] == "free"
 
 def logout_button():
     if "user" in st.session_state:

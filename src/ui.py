@@ -15,9 +15,10 @@ def render():
     # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
     st.markdown(
     """
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
     body, .stApp {
-        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
         background: #FFFFFF;
         color: #222B45;
     }
@@ -29,16 +30,17 @@ def render():
     }
     /* Botones principales */
     .stButton>button {
-        background: #4F8AFF;
+        background: #FF8800; /* Naranja principal */
         color: #fff;
         border-radius: 8px;
         font-weight: 600;
         border: none;
         padding: 0.6em 1.2em;
+        font-family: 'Poppins', sans-serif;
         transition: background 0.2s;
     }
     .stButton>button:hover {
-        background: #223354;
+        background: #de6a00;
         color: #fff;
     }
     /* Inputs, select, etc */
@@ -47,8 +49,9 @@ def render():
         border: 1px solid #E3E7ED;
         background: #FFF;
         padding: 0.5em;
+        font-family: 'Poppins', sans-serif;
     }
-    /* Tarjetas (cards) */
+    /* Tarjetas (cards), expander, tabs */
     .stDataFrameContainer, .stExpander, .stTabs, .stCard {
         border-radius: 16px;
         box-shadow: 0 2px 12px #e3e7ed29;
@@ -56,9 +59,13 @@ def render():
     }
     /* Títulos */
     h1, h2, h3, h4, h5, h6 {
-        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
         color: #223354;
         font-weight: 700;
+    }
+    /* Gráficos Plotly y otros acentos */
+    .js-plotly-plot .main-svg {
+        font-family: 'Poppins', sans-serif !important;
     }
     </style>
     """,

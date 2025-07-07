@@ -4,9 +4,11 @@ st.set_page_config(page_title="Plataforma de Análisis",
                    layout="wide",
                    initial_sidebar_state="collapsed")
 from . import ui   # solo importamos, sin llamar nada
+from .auth import login_required
 
 def main():
-    ui.render()
+    if login_required():
+        ui.render()
 
 if __name__ == "__main__":
     main()

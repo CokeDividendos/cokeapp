@@ -51,11 +51,7 @@ def login_required() -> bool:
         width=64,
     )
     st.markdown("<h4>Accede con tu cuenta Gmail (@gmail.com)</h4>", unsafe_allow_html=True)
-    # SOLO texto y key en el botón
-    result = oauth2.authorize_button(
-        "Iniciar sesión con Google",
-        key="google_login"
-    )
+    result = oauth2.authorize_button("Iniciar sesión con Google")
     st.markdown("</div></div>", unsafe_allow_html=True)
 
     if result and "token" in result:

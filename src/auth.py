@@ -155,25 +155,3 @@ def logout_button():
         if st.sidebar.button("Cerrar sesión"):
             st.session_state.clear()
             st.experimental_rerun()
-
-def get_nombre_usuario():
-    user = st.session_state.get("user_db")
-    return user[2] if user and len(user) > 2 else ""  # columna nombre
-
-def get_tipo_plan():
-    user = st.session_state.get("user_db")
-    return user[3] if user and len(user) > 3 else ""
-
-def guardar_api_key_free(api_key):
-    user = st.session_state.get("user_db")
-    if user and user[3] == "free":
-        from .db import set_user_api_key
-        set_user_api_key(user[1], api_key)
-        from .db import get_user_by_email
-        st.session_state["user_db"] = get_user_by_email(user[1])
-
-def logout_button():
-    if "user" in st.session_state:
-        if st.button("Cerrar sesión", key="logout_btn"):
-            st.session_state.clear()
-            st.experimental_rerun()

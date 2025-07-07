@@ -16,7 +16,7 @@ def login_required() -> bool:
     st.markdown(
         """
         <style>
-        .main {
+        .login-wrapper {
             display: flex;
             justify-content: center;
             align-items: center;
@@ -24,41 +24,46 @@ def login_required() -> bool:
         }
         .login-card {
             width: 340px;
-            padding: 2rem 2.5rem;
+            padding: 2.5rem 2rem;
             border-radius: 14px;
-            background: rgba(255,255,255,0.07);
-            border: 1px solid rgba(255,255,255,0.15);
-            box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+            background: rgba(255,255,255,0.97);
+            border: 1px solid rgba(150,150,150,0.14);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.15);
             text-align: center;
+            margin: 0 auto;
         }
         .login-card img {
             width: 64px;
-            margin: 0 auto;
+            margin: 0 auto 1.2rem;
+            display: block;
         }
         .login-card h4 {
             margin-bottom: 1.2rem;
         }
         </style>
+        <div class="login-wrapper">
+          <div class="login-card">
         """,
         unsafe_allow_html=True,
     )
 
-    with st.container():
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        st.image(
-            "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",
-            width=64,
-        )
-        st.markdown("<h4>Accede con tu cuenta Gmail (@gmail.com)</h4>", unsafe_allow_html=True)
-        result = oauth2.authorize_button(
-            "Iniciar sesión con Google",
-            authorize_url="https://accounts.google.com/o/oauth2/auth",
-            token_url="https://oauth2.googleapis.com/token",
-            redirect_url="https://cokeapp.streamlit.app/",
-            scope="https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
-            key="google_login"
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.image(
+        "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",
+        width=64,
+    )
+    st.markdown("<h4>Accede con tu cuenta Gmail (@gmail.com)</h4>", unsafe_allow_html=True)
+    # El botón debe ir aquí dentro:
+    result = oauth2.authorize_button(
+        "Iniciar sesión con Google",
+        authorize_url="https://accounts.google.com/o/oauth2/auth",
+        token_url="https://oauth2.googleapis.com/token",
+        redirect_url="https://cokeapp.streamlit.app",  # <-- asegúrate que coincide con Google Cloud
+        scope="https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
+        # Si da error, prueba quitando "key"
+        key="google_login"
+    )
+    # Cierra el div
+    st.markdown("</div></div>", unsafe_allow_html=True)
 
     if result and "token" in result:
         email = result["token"].get("email")

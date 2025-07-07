@@ -2,33 +2,25 @@ import streamlit as st
 from streamlit_oauth import OAuth2Component
 from .db import get_user, upsert_user
 
-# ── Credenciales OAuth ─────────────────────────────────────────────────────────
 _CLIENT_ID = st.secrets["google"]["client_id"]
 _CLIENT_SECRET = st.secrets["google"]["client_secret"]
 
-# ── Google OAuth2 end-points  ─────────────────────────────────────────────────
-AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
-TOKEN_URL = "https://oauth2.googleapis.com/token"
-REDIRECT_URI = "https://cokeapp.streamlit.app"          # debe estar en Google Cloud
-
-# ── Componente OAuth2  ────────────────────────────────────────────────────────
 oauth2 = OAuth2Component(
-    client_id=_CLIENT_ID,
-    client_secret=_CLIENT_SECRET,
-    authorize_url=AUTH_URL,          # nombre correcto
-    token_url=TOKEN_URL,             # nombre correcto
-    redirect_uri=REDIRECT_URI,       # la clase admite este parámetro
-    scope="openid email profile",
+    _CLIENT_ID,
+    _CLIENT_SECRET,
+    authorize_url="https://accounts.google.com/o/oauth2/auth",
+    token_url="https://oauth2.googleapis.com/token",
+    redirect_url="https://cokeapp.streamlit.app/",
+    scope="https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
 )
 
-# ── Helpers de sesión ─────────────────────────────────────────────────────────
+
 def login_required() -> bool:
-    """Muestra el botón Google hasta que el usuario se autentique."""
+    """Show Google login button until the user authenticates."""
     if "user" in st.session_state:
         return True
 
-    result = oauth2.authorize_button("Iniciar sesión con Google",
-                                     key="google_login")
+    result = oauth2.authorize_button("Iniciar sesión con Google", key="google_login")
     if result and "token" in result:
         email = result["token"]["email"]
         upsert_user(email=email)
@@ -39,8 +31,7 @@ def login_required() -> bool:
 
 
 def logout_button() -> None:
-    """Renderiza un botón de cierre de sesión en el sidebar."""
-    if "user" in st.session_state:
-        if st.sidebar.button("Cerrar sesión"):
-            st.session_state.clear()
-            st.experimental_rerun()
+    """Render a logout button in the sidebar."""
+    if st.sidebar.button("Cerrar sesión"):
+        st.session_state.clear()
+        st.experimental_rerun()

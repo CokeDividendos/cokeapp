@@ -25,16 +25,21 @@ oauth2 = OAuth2Component(
     "openid email profile",                       # scope (string!)
 )
 
-# ── Helpers de sesión ─────────────────────────────────────────────────────────
 def login_required() -> bool:
     """Muestra el botón Google hasta que el usuario esté autenticado."""
     if "user" in st.session_state:
         return True
 
-    result = oauth2.authorize_button("Iniciar sesión con Google", key="google_login")
+    result = oauth2.authorize_button(
+        "Iniciar sesión con Google",              # label
+        "https://cokeapp.streamlit.app",          # redirect_uri
+        "openid email profile",                   # scope
+        key="google_login",
+    )
+
     if result and "token" in result:
         email = result["token"]["email"]
-        upsert_user(email=email)                  # inserta si no existe
+        upsert_user(email=email)
         st.session_state["user"] = get_user(email)
         return True
 

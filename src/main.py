@@ -6,4 +6,4 @@ def main():
         logout_button()
         st.title("Bienvenido a CokeApp")
         st.write(f"¡Hola, {st.session_state['user']}!")
-        # Aquí tu UI principal
+        # ... Aquí tu UI principal

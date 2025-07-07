@@ -1,37 +1,26 @@
 import streamlit as st
-from streamlit_authenticator.google_authenticator import GoogleAuthenticator
+from streamlit_oauth import OAuth2Component
+from db import get_user, upsert_user
 
-from .db import get_user, upsert_user
+_CLIENT_ID = st.secrets["google"]["client_id"]
+_CLIENT_SECRET = st.secrets["google"]["client_secret"]
 
-
-_authenticator = None
-
-
-def _get_authenticator():
-    global _authenticator
-    if _authenticator is None:
-        _authenticator = GoogleAuthenticator(
-            name="Coke Dividendos App",
-            client_id=st.secrets["google"]["client_id"],
-            client_secret=st.secrets["google"]["client_secret"],
-        )
-    return _authenticator
-
+oauth2 = OAuth2Component(
+    _CLIENT_ID,
+    _CLIENT_SECRET,
+    "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
+    redirect_uri="https://cokeapp.streamlit.app/",
+    token_uri="https://oauth2.googleapis.com/token",
+    authorization_uri="https://accounts.google.com/o/oauth2/auth",
+)
 
 def login_required() -> bool:
-    """Show Google login button and return True if user authenticated."""
-    authenticator = _get_authenticator()
-    user = authenticator.login("Iniciar sesión")
-    if user:
-        # Ensure we have user record
-        name = user.get("name")
-        email = user.get("email")
-        st.session_state["current_user"] = {"name": name, "email": email}
-        if not get_user(email):
-            upsert_user(email=email)
+    if "user" in st.session_state:
         return True
-    return False
 
-
-def current_user():
-    return st.session_state.get("current_user")
+    result = oauth2.authorize_button("Iniciar sesión con Google", key="google_login")
+    if result and "token" in result:
+        email = result["token"]["email"]
+        st.session_state["user"] = upsert_user(email=email)
+        return True
+    st.stop()

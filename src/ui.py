@@ -72,17 +72,6 @@ def render():
     unsafe_allow_html=True,
 )
 
-     def render_dashboard():
-         st.write("Aquí va el dashboard.")
-     
-     def render_analisis_empresas():
-         st.write("Aquí va el análisis de empresas.")
-     
-     def render_seguimiento_cartera():
-         st.write("Aquí va el seguimiento de cartera.")
-     
-     def render_analizar_etfs():
-         st.write("Aquí va el análisis de ETFs.")
     # ╔═════════════ 3) HELPERS  (logo y resumen IA) ═════════════════════════════════════════════
     @cache_data(show_spinner="💬 Traduciendo y resumiendo…", ttl=60 * 60 * 24)
     def resumen_es(short_desc_en: str) -> str:

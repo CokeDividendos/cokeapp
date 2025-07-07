@@ -14,24 +14,56 @@ def render():
 
     # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
     st.markdown(
-        """
-        <style>
-        html, body, [class*="css"]{font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
-        @media (max-width:750px){
-            .main .block-container{padding:1rem .5rem}
-            .element-container{width:100%!important}
-            h1,h2{font-size:1.2rem}
-        }
-        /* Hace redondo cualquier logo descargado */
-        img[src*="logo.clearbit.com"], img[src$=".png"]{
-            border-radius:50%;
-            background:#fff;
-            padding:4px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """
+    <style>
+    body, .stApp {
+        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        background: #FFFFFF;
+        color: #222B45;
+    }
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background: #F6F7FA;
+        border-radius: 16px 0 0 16px;
+        box-shadow: 2px 0 6px #e3e7ed44;
+    }
+    /* Botones principales */
+    .stButton>button {
+        background: #4F8AFF;
+        color: #fff;
+        border-radius: 8px;
+        font-weight: 600;
+        border: none;
+        padding: 0.6em 1.2em;
+        transition: background 0.2s;
+    }
+    .stButton>button:hover {
+        background: #223354;
+        color: #fff;
+    }
+    /* Inputs, select, etc */
+    .stTextInput>div>input, .stSelectbox>div>div>div>input {
+        border-radius: 8px;
+        border: 1px solid #E3E7ED;
+        background: #FFF;
+        padding: 0.5em;
+    }
+    /* Tarjetas (cards) */
+    .stDataFrameContainer, .stExpander, .stTabs, .stCard {
+        border-radius: 16px;
+        box-shadow: 0 2px 12px #e3e7ed29;
+        background: #FFF;
+    }
+    /* Títulos */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        color: #223354;
+        font-weight: 700;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
     # ╔═════════════ 3) HELPERS  (logo y resumen IA) ═════════════════════════════════════════════
     @cache_data(show_spinner="💬 Traduciendo y resumiendo…", ttl=60 * 60 * 24)

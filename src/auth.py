@@ -5,18 +5,10 @@ from .db import get_user, upsert_user
 _CLIENT_ID = st.secrets["google"]["client_id"]
 _CLIENT_SECRET = st.secrets["google"]["client_secret"]
 
-# Todos los parámetros importantes van en el constructor con la versión >=0.3.0
-oauth2 = OAuth2Component(
-    client_id=_CLIENT_ID,
-    client_secret=_CLIENT_SECRET,
-    authorize_url="https://accounts.google.com/o/oauth2/auth",
-    token_url="https://oauth2.googleapis.com/token",
-    redirect_url="https://cokeapp.streamlit.app",  # Ajusta si tu redirect_url es distinto en Google Cloud
-    scope="https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
-)
+# Solo client_id y client_secret en el constructor
+oauth2 = OAuth2Component(_CLIENT_ID, _CLIENT_SECRET)
 
 def login_required() -> bool:
-    """Return True once the user logs in with Google and has a Gmail account."""
     if "user" in st.session_state:
         return True
 
@@ -61,6 +53,10 @@ def login_required() -> bool:
     st.markdown("<h4>Accede con tu cuenta Gmail (@gmail.com)</h4>", unsafe_allow_html=True)
     result = oauth2.authorize_button(
         "Iniciar sesión con Google",
+        authorize_url="https://accounts.google.com/o/oauth2/auth",
+        token_url="https://oauth2.googleapis.com/token",
+        redirect_url="https://cokeapp.streamlit.app",
+        scope="https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
         key="google_login"
     )
     st.markdown("</div></div>", unsafe_allow_html=True)
@@ -80,7 +76,6 @@ def login_required() -> bool:
     st.stop()
 
 def logout_button() -> None:
-    """Render a logout button in the sidebar."""
     if st.sidebar.button("Cerrar sesión"):
         st.session_state.clear()
         st.experimental_rerun()

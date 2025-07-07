@@ -1,3 +1,36 @@
-"""App package initialization"""
+import streamlit as st
+import streamlit_authenticator as stauth
 
-from . import db  # ensure database initialized
+from .db import get_user, upsert_user
+
+
+_authenticator = None
+
+
+def _get_authenticator():
+    global _authenticator
+    if _authenticator is None:
+        _authenticator = stauth.GoogleAuthenticator(
+            st.secrets["google"]["client_id"],
+            st.secrets["google"]["client_secret"],
+        )
+    return _authenticator
+
+
+def login_required() -> bool:
+    """Show Google login button and return True if user authenticated."""
+    authenticator = _get_authenticator()
+    user = authenticator.login("Iniciar sesión")
+    if user:
+        # Ensure we have user record
+        name = user.get("name")
+        email = user.get("email")
+        st.session_state["current_user"] = {"name": name, "email": email}
+        if not get_user(email):
+            upsert_user(email=email)
+        return True
+    return False
+
+
+def current_user():
+    return st.session_state.get("current_user")

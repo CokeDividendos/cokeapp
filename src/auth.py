@@ -33,7 +33,7 @@ def login_required():
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
             <div style="text-align:center; margin-top:48px;">
                 <img src="https://i.imgur.com/aznQh7O.png" width="96" style="border-radius:24px;box-shadow:0 2px 8px #ff880033;">
-                <h2 style="color:#223354;font-family:'Inter',sans-serif;margin-top:16px;">Bienvenido a <span style="color:#FF8800;">CokeApp</span></h2>
+                <h2 style="color:#223354;font-family:'Inter',sans-serif;margin-top:16px;">Bienvenido a <span style="color:#FF8800;">Dividends Up!</span></h2>
                 <p style="color:#6B778C;font-size:1.12em;margin-bottom:36px;">
                     Plataforma profesional para análisis financiero y seguimiento de inversiones.
                 </p>

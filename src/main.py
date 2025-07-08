@@ -1,3 +1,4 @@
+import streamlit as st
 from src.auth import login_required, logout_button
 from src.ui import render
 
@@ -8,7 +9,6 @@ def main():
             st.write("Usuario actual:", st.session_state.get("user_email"))
             st.write("Nombre:", st.session_state.get("user_name"))
             logout_button()
-        # Puedes mostrar el nombre en la UI principal si quieres:
         st.markdown(
             f"<h2>Bienvenido, {st.session_state.get('user_name','')}</h2>",
             unsafe_allow_html=True

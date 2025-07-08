@@ -29,7 +29,14 @@ def main():
             btn3 = st.button("Analizar ETF's", use_container_width=True, key="btn_etf")
             btn4 = st.button("Finanzas Personales", use_container_width=True, key="btn_finanzas")
             btn5 = st.button("Calculadora de Interés Compuesto", use_container_width=True, key="btn_calc")
-
+            
+            if st.button("Ver usuarios registrados"):
+                usuarios = db.listar_usuarios()
+                st.write("Usuarios registrados:")
+                for u in usuarios:
+                    st.write(f"ID: {u[0]}, Email: {u[1]}, Nombre: {u[2]}")
+            
+            
             if btn1:
                 section = "Valoración y Análisis Financiero"
             elif btn2:

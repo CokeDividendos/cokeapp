@@ -13,11 +13,16 @@ def login_required():
     from .db import get_user_by_email, sqlite3, DB_PATH
     import datetime
 
-    # Limpia parámetros de error OAuth si los hay
+    # Si ya hay usuario en sesión, úsalo directamente
+    if "user" in st.session_state and "user_db" in st.session_state:
+        return True
+
+    # Limpia parámetros de error OAuth
     if "error" in st.query_params:
         st.query_params.clear()
         st.experimental_rerun()
 
+    # Configuración Google
     if "google" not in st.secrets:
         st.error("No se encontró la sección [google] en los secrets de Streamlit Cloud.")
         st.stop()
@@ -34,26 +39,8 @@ def login_required():
         "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/userinfo.email"
     ]
-    if "google_token" in st.session_state and "user" in st.session_state:
-        email = st.session_state["user"]
-        user = get_user_by_email(email)
-        st.session_state["user_db"] = user
-        return True
-
     query_params = st.query_params
     if "code" not in query_params:
-        st.markdown(
-            """
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-            <div style="text-align:center; margin-top:48px;">
-                <img src="https://i.imgur.com/aznQh7O.png" width="96" style="border-radius:24px;box-shadow:0 2px 8px #ff880033;">
-                <h2 style="color:#223354;font-family:'Inter',sans-serif;margin-top:16px;">Bienvenido a <span style="color:#FF8800;">Dividends Up!</span></h2>
-                <p style="color:#6B778C;font-size:1.12em;margin-bottom:36px;">
-                    Tu plataforma para Seguimiento de Portafolio y Análisis Financiero Profesional.
-                </p>
-            </div>
-            """, unsafe_allow_html=True
-        )
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -67,14 +54,14 @@ def login_required():
             scopes=scopes,
             redirect_uri=redirect_uri,
         )
+        # ¡Fuerza elegir cuenta SIEMPRE!
         auth_url, _ = flow.authorization_url(
-            prompt='consent',
+            prompt='select_account',
             access_type='offline',
             include_granted_scopes='true'
         )
         st.markdown(
-            f"""
-            <div style="display:flex;justify-content:center;margin-top:32px">
+            f"""<div style="display:flex;justify-content:center;margin-top:32px">
               <a href="{auth_url}">
                 <button style="
                     font-size:1.15rem;
@@ -87,17 +74,14 @@ def login_required():
                     font-weight:600;
                     box-shadow:0 2px 8px #ff880033;
                     cursor:pointer;
-                    transition:background .14s;
-                " 
-                onmouseover="this.style.background='#de6a00';"
-                onmouseout="this.style.background='#FF8800';"
+                    transition:background .14s;"
+                    onmouseover="this.style.background='#de6a00';"
+                    onmouseout="this.style.background='#FF8800';"
                 >
                     <img src="https://www.svgrepo.com/show/475656/google-color.svg" width="24" style="vertical-align:middle;margin-right:10px;margin-bottom:4px">Iniciar sesión con Google
                 </button>
               </a>
-            </div>
-            """,
-            unsafe_allow_html=True,
+            </div>""", unsafe_allow_html=True,
         )
         st.stop()
     else:
@@ -120,7 +104,7 @@ def login_required():
         flow.fetch_token(code=code)
         credentials = flow.credentials
 
-        # Obtiene info de usuario desde Google
+        # Info de Google
         resp = requests.get(
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {credentials.token}"},
@@ -144,13 +128,14 @@ def login_required():
             conn.commit()
         conn.close()
 
+        # IMPORTANTE: Actualiza SIEMPRE el estado de sesión CON EL EMAIL DE GOOGLE
         st.session_state["google_token"] = credentials.token
         st.session_state["user"] = email
         st.session_state["user_db"] = user
         st.query_params.clear()
         st.experimental_rerun()
     return True
-
+    
 def is_admin():
     user = st.session_state.get("user_db")
     return user and user[3] == "admin"  # tipo_plan columna 3

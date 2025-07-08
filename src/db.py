@@ -50,3 +50,19 @@ def set_user_api_key(email, api_key):
     cur.execute("UPDATE usuarios SET api_key = ? WHERE email = ?", (api_key, email))
     conn.commit()
     conn.close()
+
+def upsert_user(email: str, **fields) -> None:
+    """Update or insert a user record with the given fields."""
+    if not fields:
+        return
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    placeholders = ", ".join(f"{k} = ?" for k in fields)
+    values = list(fields.values()) + [email]
+    cur.execute(f"UPDATE usuarios SET {placeholders} WHERE email = ?", values)
+    if cur.rowcount == 0:
+        cols = ",".join(["email"] + list(fields.keys()))
+        qs = ",".join(["?"] * (len(fields) + 1))
+        cur.execute(f"INSERT INTO usuarios ({cols}) VALUES ({qs})", [email, *fields.values()])
+    conn.commit()
+    conn.close()

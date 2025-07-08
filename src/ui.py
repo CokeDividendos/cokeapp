@@ -2,126 +2,113 @@
 # 1) IMPORTS & CONFIG
 import os, textwrap
 import streamlit as st
-st.set_page_config(layout="wide")
 import pandas as pd, plotly.graph_objects as go, plotly.express as px, numpy as np
 import yfinance as yf
+from .auth import get_nombre_usuario
 from .services.yf_client import YF_SESSION, safe_history, history_resiliente, get_logo_url
 from .services.cache import cache_data
 
+st.set_page_config(layout="wide")
 
 def render():
-     
-# ───── 1-A  page config (¡debe ser la PRIMERA llamada st.*!) ──────────────────
-
-# ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
-st.markdown(
-"""
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-body, .stApp {
-    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    background: #FFFFFF;
-    color: #222B45;
-}
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background: #F6F7FA;
-    border-radius: 16px 0 0 16px;
-    box-shadow: 2px 0 6px #e3e7ed44;
-}
-/* Botones principales */
-.stButton>button {
-    background: #FF8800; /* Naranja principal */
-    color: #fff;
-    border-radius: 8px;
-    font-weight: 600;
-    border: none;
-    padding: 0.6em 1.2em;
-    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    transition: background 0.2s;
-}
-.stButton>button:hover {
-    background: #de6a00;
-    color: #fff;
-}
-/* Inputs, select, etc */
-.stTextInput>div>input, .stSelectbox>div>div>div>input {
-    border-radius: 8px;
-    border: 1px solid #E3E7ED;
-    background: #FFF;
-    padding: 0.5em;
-    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-}
-/* Tarjetas (cards), expander, tabs */
-.stDataFrameContainer, .stExpander, .stTabs, .stCard {
-    border-radius: 16px;
-    box-shadow: 0 2px 12px #e3e7ed29;
-    background: #FFF;
-}
-/* Títulos */
-h1, h2, h3, h4, h5, h6 {
-    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    color: #223354;
-    font-weight: 700;
-}
-/* Gráficos Plotly y otros acentos */
-.js-plotly-plot .main-svg {
-    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
-}
-</style>
-""",
-unsafe_allow_html=True,
-)
-
-# ╔═════════════ 3) HELPERS  (logo y resumen IA) ═════════════════════════════════════════════
-@cache_data(show_spinner="💬 Traduciendo y resumiendo…", ttl=60 * 60 * 24)
-def resumen_es(short_desc_en: str) -> str:
-    """Resumen en español usando OpenAI (requiere OPENAI_API_KEY en Secrets)."""
-    try:
-        import openai, os  # sólo si el usuario puso su clave
-
-        openai.api_key = st.secrets["OPENAI_API_KEY"]
-        prompt = textwrap.dedent(
-            f"""
-            Resume al español en máximo 120 palabras, tono divulgativo,
-            el siguiente texto EXPLICANDO qué hace la empresa.\n\n{short_desc_en}
-        """
-        )
-        rsp = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=180,
-            temperature=0.5,
-        )
-        return rsp.choices[0].message.content.strip()
-    except Exception:
-        return "Resumen no disponible"
-
-# ╔═════════════ Saludo y API-Key free ════════════════════════════════════
-st.markdown(
-    f"<h3 style='text-align:center;'>Hola, {get_nombre_usuario()} 👋</h3>",
+    # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
+    st.markdown(
+    """
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+    body, .stApp {
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background: #FFFFFF;
+        color: #222B45;
+    }
+    section[data-testid="stSidebar"] {
+        background: #F6F7FA;
+        border-radius: 16px 0 0 16px;
+        box-shadow: 2px 0 6px #e3e7ed44;
+    }
+    .stButton>button {
+        background: #FF8800;
+        color: #fff;
+        border-radius: 8px;
+        font-weight: 600;
+        border: none;
+        padding: 0.6em 1.2em;
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        transition: background 0.2s;
+    }
+    .stButton>button:hover {
+        background: #de6a00;
+        color: #fff;
+    }
+    .stTextInput>div>input, .stSelectbox>div>div>div>input {
+        border-radius: 8px;
+        border: 1px solid #E3E7ED;
+        background: #FFF;
+        padding: 0.5em;
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+    .stDataFrameContainer, .stExpander, .stTabs, .stCard {
+        border-radius: 16px;
+        box-shadow: 0 2px 12px #e3e7ed29;
+        background: #FFF;
+    }
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        color: #223354;
+        font-weight: 700;
+    }
+    .js-plotly-plot .main-svg {
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+    }
+    </style>
+    """,
     unsafe_allow_html=True,
-)     
+    )
 
-     ########################  ENTRADAS  ######################################################
+    # Helper para resumen IA
+    @cache_data(show_spinner="💬 Traduciendo y resumiendo…", ttl=60 * 60 * 24)
+    def resumen_es(short_desc_en: str) -> str:
+        """Resumen en español usando OpenAI (requiere OPENAI_API_KEY en Secrets)."""
+        try:
+            import openai
+            openai.api_key = st.secrets["OPENAI_API_KEY"]
+            prompt = textwrap.dedent(
+                f"""
+                Resume al español en máximo 120 palabras, tono divulgativo,
+                el siguiente texto EXPLICANDO qué hace la empresa.\n\n{short_desc_en}
+            """
+            )
+            rsp = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=180,
+                temperature=0.5,
+            )
+            return rsp.choices[0].message.content.strip()
+        except Exception:
+            return "Resumen no disponible"
+
+    # ╔═════════════ Saludo ════════════════════════════════════
+    st.markdown(
+        f"<h3 style='text-align:center;'>Hola, {get_nombre_usuario()} 👋</h3>",
+        unsafe_allow_html=True,
+    )
+
+    # ------------------------------ ENTRADAS PRINCIPALES -------------------------------
     col_logo, col_title = st.columns([1, 5])
     ticker_input = st.text_input("🔎 Ticker (ej.: AAPL, MSFT, KO)", "AAPL")
 
     period_dict = {"5 años": "5y", "10 años": "10y", "15 años": "15y", "20 años": "20y"}
-    period_label = st.selectbox("⏳ Período", list(period_dict))  # lo que ve el usuario
-    selected_period = period_dict[period_label]  # la clave que usa YF
+    period_label = st.selectbox("⏳ Período", list(period_dict))
+    selected_period = period_dict[period_label]
 
     interval_dict = {"Diario": "1d", "Mensual": "1mo"}
     interval_label = st.selectbox("📆 Frecuencia", list(interval_dict))
     selected_interval = interval_dict[interval_label]
 
-    ########################  DESCARGA YF  #####################################################
     try:
         ticker_data = yf.Ticker(ticker_input, session=YF_SESSION)
-
-        # ⬇️ 1️⃣  CREA info ANTES de usarlo
         info = ticker_data.info or {}
-
         price_data = safe_history(
             ticker_input,
             period=selected_period,
@@ -132,19 +119,19 @@ st.markdown(
             st.warning("No se encontraron datos para ese ticker.")
             st.stop()
 
-        ########################  LOGO + TÍTULO ###############################################
+        # Logo + Título
         logo_url = get_logo_url(info)
         with col_logo:
             if logo_url:
                 st.image(logo_url, width=90)
         with col_title:
             st.title(f" {info.get('longName', ticker_input)}")
-            # sector / industria justo bajo el título
             st.markdown(f"**Sector:** {info.get('sector','N/D')}   |   **Industria:** {info.get('industry','N/D')}")
 
-        ########################  RESUMEN BREVE IA  ###########################################
+        # Resumen IA
         if info.get("longBusinessSummary"):
             st.write(resumen_es(info["longBusinessSummary"]))
+
 
         # A partir de aquí TODO tu código de métricas, gráficos, etc. permanece igual
         #  (no lo repito para ahorrar espacio — no lo borres en tu archivo)

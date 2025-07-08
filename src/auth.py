@@ -1,18 +1,11 @@
 import streamlit as st
 from google_auth_oauthlib.flow import Flow
 import requests
-from .db import init_db, get_user_by_email
-import datetime
+from .db import init_db, get_user_by_email, sqlite3, DB_PATH
 
 init_db()
 
 def login_required():
-    import streamlit as st
-    from google_auth_oauthlib.flow import Flow
-    import requests
-    from .db import get_user_by_email, sqlite3, DB_PATH
-    import datetime
-
     # Si ya hay usuario en sesión, úsalo directamente
     if "user" in st.session_state and "user_db" in st.session_state:
         return True
@@ -54,7 +47,7 @@ def login_required():
             scopes=scopes,
             redirect_uri=redirect_uri,
         )
-        # ¡Fuerza elegir cuenta SIEMPRE!
+        # Forzar selección de cuenta SIEMPRE
         auth_url, _ = flow.authorization_url(
             prompt='select_account',
             access_type='offline',
@@ -113,6 +106,9 @@ def login_required():
         email = user_info.get("email")
         nombre = user_info.get("name", "")
 
+        # Debug temporal
+        st.write(f"Email de Google: {email}, Nombre: {nombre}")
+
         # Siempre sincroniza el nombre desde Google, aunque el usuario ya exista
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
@@ -128,30 +124,13 @@ def login_required():
             conn.commit()
         conn.close()
 
-        # IMPORTANTE: Actualiza SIEMPRE el estado de sesión CON EL EMAIL DE GOOGLE
+        # Actualiza SIEMPRE el estado de sesión CON EL EMAIL DE GOOGLE
         st.session_state["google_token"] = credentials.token
         st.session_state["user"] = email
         st.session_state["user_db"] = user
         st.query_params.clear()
         st.experimental_rerun()
     return True
-    
-def is_admin():
-    user = st.session_state.get("user_db")
-    return user and user[3] == "admin"  # tipo_plan columna 3
-
-def is_premium():
-    user = st.session_state.get("user_db")
-    if user and user[3] == "premium":
-        exp = user[5]
-        if exp:
-            return exp > str(datetime.date.today())
-        return True
-    return False
-
-def is_free():
-    user = st.session_state.get("user_db")
-    return user and user[3] == "free"
 
 def get_nombre_usuario():
     user = st.session_state.get("user_db")
@@ -162,12 +141,10 @@ def get_tipo_plan():
     return user[3] if user and len(user) > 3 else ""
 
 def logout_button():
-    import streamlit as st
     if "user" in st.session_state:
         if st.button("Cerrar sesión", key="logout_btn"):
             for k in list(st.session_state.keys()):
                 del st.session_state[k]
-            # Limpia los parámetros de la URL para evitar errores OAuth
             try:
                 st.query_params.clear()
             except Exception:

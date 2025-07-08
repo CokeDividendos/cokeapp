@@ -8,6 +8,14 @@ from .auth import (
 from .ui import render
 import streamlit as st
 
+import src.db as db  # Ajusta el import si tu estructura de carpetas es diferente
+
+if st.sidebar.button("Ver usuarios registrados"):
+    usuarios = db.listar_usuarios()  # Asegúrate de tener la función listar_usuarios en src/db.py
+    st.sidebar.write("Usuarios registrados:")
+    for u in usuarios:
+        st.sidebar.write(f"ID: {u[0]}, Email: {u[1]}, Nombre: {u[2]}")
+        
 def main():
     # 1. Configuración de página en modo wide
     st.set_page_config(layout="wide")

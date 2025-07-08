@@ -116,16 +116,20 @@ def login_required():
         user_info = resp.json()
         email = user_info.get("email")
         nombre = user_info.get("name", "")
-        # Sincroniza con SQLite
+
+        # Siempre sincroniza el nombre desde Google, aunque el usuario ya exista
+        from .db import sqlite3, DB_PATH
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
         user = get_user_by_email(email)
         if not user:
-            from .db import sqlite3, DB_PATH
-            conn = sqlite3.connect(DB_PATH)
-            cur = conn.cursor()
             cur.execute("INSERT INTO usuarios (email, nombre) VALUES (?, ?)", (email, nombre))
-            conn.commit()
-            conn.close()
-            user = get_user_by_email(email)
+        else:
+            cur.execute("UPDATE usuarios SET nombre = ? WHERE email = ?", (nombre, email))
+        conn.commit()
+        conn.close()
+        user = get_user_by_email(email)
+
         st.session_state["google_token"] = credentials.token
         st.session_state["user"] = email
         st.session_state["user_db"] = user

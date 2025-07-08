@@ -5,23 +5,10 @@ import requests
 import datetime
 from .db import init_db, upsert_user, get_user_by_email
 
-# Asegura que la tabla exista
+# Asegura que la tabla de usuarios exista
 init_db()
 
 def _build_client_config(google_cfg: dict) -> dict:
-    """
-    Construye el dict que Google espera:
-    {
-      "web": {
-        "client_id": ...,
-        "client_secret": ...,
-        "auth_uri": ...,
-        "token_uri": ...,
-        "redirect_uris": [...],
-      }
-    }
-    Rellena auth_uri/token_uri con valores por defecto si no están.
-    """
     return {
         "web": {
             "client_id": google_cfg["client_id"],
@@ -40,31 +27,27 @@ def _build_client_config(google_cfg: dict) -> dict:
 
 def login_required() -> bool:
     """
-    Gestiona OAuth2 con Google:
-      1. Si no hay usuario en session_state, redirige a Google
-      2. Procesa el callback, guarda/actualiza en BD y recarga.
-      3. Retorna True si ya está logueado.
+    1) Si no hay [google] en secrets: error.
+    2) Si no hay user_db en sesión: inicia OAuth o procesa el callback.
+       - Muestra un botón naranja para iniciar sesión.
+    3) Tras callback, guarda/actualiza usuario en BD y recarga.
     """
-    # 1) Revisar que exista sección [google] en Secrets
     if "google" not in st.secrets:
         st.error("❌ Falta la sección [google] en los Secrets de Streamlit.")
         st.stop()
-
     google_cfg = st.secrets["google"]
-    for key in ("client_id", "client_secret", "redirect_uri"):
-        if key not in google_cfg:
-            st.error(f"❌ Falta '{key}' en tus Secrets bajo [google].")
+    for k in ("client_id", "client_secret", "redirect_uri"):
+        if k not in google_cfg:
+            st.error(f"❌ Falta '{k}' en tus Secrets bajo [google].")
             st.stop()
 
-    # Construir la configuración completa para google_auth_oauthlib
     client_config = _build_client_config(google_cfg)
     redirect = google_cfg["redirect_uri"]
 
-    # 2) Si no hay usuario en session, iniciar o procesar OAuth
     if "user_db" not in st.session_state:
         params = st.experimental_get_query_params()
 
-        # 2a) Sin 'code': pedir autorización a Google
+        # 1) Sin código: pedir permiso
         if "code" not in params:
             flow = Flow.from_client_config(
                 client_config,
@@ -81,10 +64,33 @@ def login_required() -> bool:
                 prompt="select_account",
             )
             st.session_state["oauth_state"] = state
-            st.markdown(f"[🔐 Iniciar sesión con Google]({auth_url})")
+
+            # --- BOTÓN NARANJO PARA LOGIN ---
+            st.markdown(
+                f"""
+                <div style="text-align:center; margin-top:4rem;">
+                  <a
+                    href="{auth_url}"
+                    style="
+                      display:inline-block;
+                      background-color:#FF8800;
+                      color:white;
+                      padding:1rem 2rem;
+                      border-radius:6px;
+                      text-decoration:none;
+                      font-weight:600;
+                      font-size:1.1rem;
+                    "
+                  >
+                    🔐 Iniciar sesión con Google
+                  </a>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
             return False
 
-        # 2b) Con 'code': intercambio y obtención de datos
+        # 2) Con código: intercambiar token y obtener info
         code = params["code"][0]
         flow = Flow.from_client_config(
             client_config,
@@ -107,12 +113,11 @@ def login_required() -> bool:
 
         info = resp.json()
         email = info.get("email")
-        name = info.get("name") or ""
+        name  = info.get("name", "")
         if not email:
             st.error("No se obtuvo correo del usuario.")
             st.stop()
 
-        # 3) Grabar o actualizar en BD
         upsert_user(
             email=email,
             nombre=name,
@@ -120,26 +125,30 @@ def login_required() -> bool:
         )
         st.session_state["user_db"] = get_user_by_email(email)
 
-        # 4) Limpiar params y recargar
         st.experimental_set_query_params()
         st.experimental_rerun()
         return False
 
-    # Ya hay sesión activa
     return True
 
+
 def get_nombre_usuario() -> str | None:
-    """Devuelve el nombre registrado en BD."""
+    """Retorna el nombre para saludo."""
     u = st.session_state.get("user_db")
     return u[2] if (u and len(u) >= 3) else None
 
+
 def get_tipo_plan() -> str:
-    """Devuelve el tipo de cuenta (free/premium/admin)."""
+    """Retorna el tipo de cuenta (free/premium/admin)."""
     u = st.session_state.get("user_db")
     return u[3] if (u and len(u) >= 4 and u[3]) else "free"
 
+
 def logout_button():
-    """Botón para limpiar sesión y recargar la app."""
-    if st.sidebar.button("🚪 Cerrar sesión"):
+    """
+    Botón de Cerrar sesión con key único.
+    Al pulsar, limpia la sesión y recarga.
+    """
+    if st.sidebar.button("🚪 Cerrar sesión", key="logout_btn"):
         st.session_state.clear()
         st.experimental_rerun()

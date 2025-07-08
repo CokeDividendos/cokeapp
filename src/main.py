@@ -68,17 +68,6 @@ def main():
 
             logout_button()
         
-        # Encabezado principal con nombre del usuario logueado
-        nombre = get_nombre_usuario()
-        st.markdown(
-            f"""
-            <h1 style="margin-bottom:0.6em;">
-              Bienvenido a <span style="color:#FF8800;">Dividends Up!</span> {nombre or ""}
-            </h1>
-            """,
-            unsafe_allow_html=True,
-        )
-
         # Render de la UI principal
         if section == "Valoración y Análisis Financiero":
             render()

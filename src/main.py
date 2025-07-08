@@ -1,12 +1,9 @@
 from .auth import (
     login_required,
-    logout_button,
-    is_admin,
-    is_premium,
-    is_free,
     get_nombre_usuario,
     get_tipo_plan,
-    guardar_api_key_free,
+    ensure_api_key,
+    logout_button,
 )
 from .ui import render
 import streamlit as st

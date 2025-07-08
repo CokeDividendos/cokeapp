@@ -7,6 +7,17 @@ import datetime
 init_db()
 
 def login_required():
+    import streamlit as st
+    from google_auth_oauthlib.flow import Flow
+    import requests
+    from .db import get_user_by_email, sqlite3, DB_PATH
+    import datetime
+
+    # Limpia parámetros de error OAuth si los hay
+    if "error" in st.query_params:
+        st.query_params.clear()
+        st.experimental_rerun()
+
     if "google" not in st.secrets:
         st.error("No se encontró la sección [google] en los secrets de Streamlit Cloud.")
         st.stop()
@@ -109,6 +120,7 @@ def login_required():
         flow.fetch_token(code=code)
         credentials = flow.credentials
 
+        # Obtiene info de usuario desde Google
         resp = requests.get(
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {credentials.token}"},
@@ -118,17 +130,19 @@ def login_required():
         nombre = user_info.get("name", "")
 
         # Siempre sincroniza el nombre desde Google, aunque el usuario ya exista
-        from .db import sqlite3, DB_PATH
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
-        user = get_user_by_email(email)
+        cur.execute("SELECT * FROM usuarios WHERE email = ?", (email,))
+        user = cur.fetchone()
         if not user:
             cur.execute("INSERT INTO usuarios (email, nombre) VALUES (?, ?)", (email, nombre))
+            conn.commit()
+            cur.execute("SELECT * FROM usuarios WHERE email = ?", (email,))
+            user = cur.fetchone()
         else:
             cur.execute("UPDATE usuarios SET nombre = ? WHERE email = ?", (nombre, email))
-        conn.commit()
+            conn.commit()
         conn.close()
-        user = get_user_by_email(email)
 
         st.session_state["google_token"] = credentials.token
         st.session_state["user"] = email
@@ -163,8 +177,14 @@ def get_tipo_plan():
     return user[3] if user and len(user) > 3 else ""
 
 def logout_button():
+    import streamlit as st
     if "user" in st.session_state:
         if st.button("Cerrar sesión", key="logout_btn"):
             for k in list(st.session_state.keys()):
                 del st.session_state[k]
+            # Limpia los parámetros de la URL para evitar errores OAuth
+            try:
+                st.query_params.clear()
+            except Exception:
+                pass
             st.experimental_rerun()

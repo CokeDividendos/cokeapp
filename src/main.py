@@ -1,6 +1,5 @@
-import streamlit as st
-from auth import login_required, logout_button
-from ui import render
+from src.auth import login_required, logout_button
+from src.ui import render
 
 def main():
     st.set_page_config(layout="wide")

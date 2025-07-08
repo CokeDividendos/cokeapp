@@ -13,18 +13,32 @@ def main():
     st.set_page_config(layout="wide")
 
     if login_required():
-        # 2. Barra lateral con navegación y datos de cuenta
+        # 2. Barra lateral profesional con botones
         with st.sidebar:
-            selected_tab = st.radio(
-                "Secciones",
-                [
-                    "Valoración y Análisis Financiero",
-                    "Seguimiento de Cartera",
-                    "Analizar ETF's",
-                    "Finanzas Personales",
-                    "Calculadora de Interés Compuesto",
-                ],
+            st.markdown(
+                "<h2 style='color:#223354;margin-bottom:1em;'>Menú</h2>",
+                unsafe_allow_html=True
             )
+
+            # Botones con estilo profesional
+            section = st.session_state.get("selected_section", "Valoración y Análisis Financiero")
+            btn1 = st.button("Valoración y Análisis Financiero", use_container_width=True, key="btn_analisis")
+            btn2 = st.button("Seguimiento de Cartera", use_container_width=True, key="btn_cartera")
+            btn3 = st.button("Analizar ETF's", use_container_width=True, key="btn_etf")
+            btn4 = st.button("Finanzas Personales", use_container_width=True, key="btn_finanzas")
+            btn5 = st.button("Calculadora de Interés Compuesto", use_container_width=True, key="btn_calc")
+
+            if btn1:
+                section = "Valoración y Análisis Financiero"
+            elif btn2:
+                section = "Seguimiento de Cartera"
+            elif btn3:
+                section = "Analizar ETF's"
+            elif btn4:
+                section = "Finanzas Personales"
+            elif btn5:
+                section = "Calculadora de Interés Compuesto"
+            st.session_state["selected_section"] = section
 
             st.markdown("---")
             tipo = get_tipo_plan()
@@ -43,11 +57,11 @@ def main():
                     "Cuenta <span style='color:#FF8800;font-weight:bold;'>Free</span>",
                     unsafe_allow_html=True,
                 )
-
             st.markdown("---")
-            logout_button()
 
-        # 3. Encabezado principal
+            logout_button()  # Botón al final
+
+        # 3. Encabezado principal con nombre
         nombre = get_nombre_usuario()
         st.markdown(
             f"""
@@ -58,9 +72,9 @@ def main():
             unsafe_allow_html=True,
         )
 
-        # 4. Renderizado de sección
-        if selected_tab == "Valoración y Análisis Financiero":
+        # 4. Renderizado de sección única principal
+        # Solo muestra la UI principal, elimina tabs internos (lo hace render())
+        if section == "Valoración y Análisis Financiero":
             render()
         else:
             st.info("Sección en construcción")
-

@@ -1,18 +1,19 @@
+# main.py
 from .auth import (
     login_required,
     get_nombre_usuario,
     get_tipo_plan,
-    ensure_api_key,
     logout_button,
 )
 from .ui import render
 import streamlit as st
 
 def main():
-    st.set_page_config(layout="wide")  # 1. Modo wide desde el inicio
+    # 1. Configuración de página en modo wide
+    st.set_page_config(layout="wide")
 
     if login_required():
-        # Sidebar navigation and account info
+        # 2. Barra lateral con navegación y datos de cuenta
         with st.sidebar:
             selected_tab = st.radio(
                 "Secciones",
@@ -27,7 +28,6 @@ def main():
 
             st.markdown("---")
             tipo = get_tipo_plan()
-            nombre = get_nombre_usuario()
             if tipo == "admin":
                 st.markdown(
                     f"<span style='color:#FF8800;font-weight:bold;'>Administrador</span>",
@@ -38,34 +38,29 @@ def main():
                     "Cuenta <span style='color:#FF8800;font-weight:bold;'>Premium</span>",
                     unsafe_allow_html=True,
                 )
-            elif tipo == "free":
+            else:
                 st.markdown(
                     "Cuenta <span style='color:#FF8800;font-weight:bold;'>Free</span>",
                     unsafe_allow_html=True,
                 )
-                st.markdown("🔑 <b>Para utilizar análisis:</b>", unsafe_allow_html=True)
-                api_key = st.text_input(
-                    "Ingresa tu API key de YF", type="password", value="", key="api_key_input"
-                )
-                if st.button("Guardar API Key"):
-                    guardar_api_key_free(api_key)
-                    st.success("API Key guardada correctamente.")
 
-            # Botón de cierre de sesión al final
             st.markdown("---")
             logout_button()
 
+        # 3. Encabezado principal
         nombre = get_nombre_usuario()
         st.markdown(
             f"""
             <h1 style="margin-bottom:0.6em;">
-              Bienvenido a <span style="color:#FF8800;">Dividends Up!</span> {nombre if nombre else ""}
+              Bienvenido a <span style="color:#FF8800;">Dividends Up!</span> {nombre or ""}
             </h1>
             """,
             unsafe_allow_html=True,
         )
 
+        # 4. Renderizado de sección
         if selected_tab == "Valoración y Análisis Financiero":
             render()
         else:
             st.info("Sección en construcción")
+

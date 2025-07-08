@@ -1,113 +1,200 @@
-# auth.py
 import streamlit as st
 from google_auth_oauthlib.flow import Flow
 import requests
+from .db import init_db, get_user_by_email, update_user_plan, set_user_api_key
 import datetime
-from .db import init_db, upsert_user, get_user_by_email
 
-# Asegurarse de crear tablas al arrancar
 init_db()
 
-def login_required() -> bool:
-    """
-    Si el usuario no está en sesión, inicia OAuth con Google.
-    Al completar, sube/actualiza el registro en BD y guarda en session_state.
-    """
-    # 1. Validar secretos de Google
+def login_required():
     if "google" not in st.secrets:
-        st.error("Falta la sección [google] en los Secrets de Streamlit Cloud.")
+        st.error("No se encontró la sección [google] en los secrets de Streamlit Cloud.")
         st.stop()
-    google_cfg = st.secrets["google"]
-    for k in ("client_id", "client_secret", "redirect_uri"):
-        if k not in google_cfg:
-            st.error(f"Falta '{k}' en los Secrets.")
+    google_secrets = st.secrets["google"]
+    for key in ("client_id", "client_secret", "redirect_uri"):
+        if key not in google_secrets:
+            st.error(f"Falta '{key}' en secrets. Por favor, revisa en Settings > Secrets de Streamlit Cloud.")
             st.stop()
+    client_id = google_secrets["client_id"]
+    client_secret = google_secrets["client_secret"]
+    redirect_uri = google_secrets["redirect_uri"]
+    scopes = [
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/userinfo.email"
+    ]
+    if "google_token" in st.session_state and "user" in st.session_state:
+        email = st.session_state["user"]
+        user = get_user_by_email(email)
+        st.session_state["user_db"] = user
+        return True
 
-    # 2. Si no hay usuario en sesión, gestionar OAuth flow
-    if "user_db" not in st.session_state:
-        params = st.experimental_get_query_params()
-        # 2a. Paso 1: redirigir a Google si no hay 'code'
-        if "code" not in params:
-            flow = Flow.from_client_config(
-                {"web": google_cfg},
-                scopes=[
-                    "openid",
-                    "https://www.googleapis.com/auth/userinfo.email",
-                    "https://www.googleapis.com/auth/userinfo.profile",
-                ],
-                redirect_uri=google_cfg["redirect_uri"],
-            )
-            auth_url, state = flow.authorization_url(
-                access_type="offline",
-                include_granted_scopes="true",
-                prompt="select_account"
-            )
-            st.session_state["oauth_state"] = state
-            st.markdown(f"[➤ Iniciar sesión con Google]({auth_url})")
-            return False
-        # 2b. Paso 2: procesar callback con código
-        code = params["code"][0]
+    query_params = st.query_params
+    if "code" not in query_params:
+        st.markdown(
+            """
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+            <div style="text-align:center; margin-top:48px;">
+                <img src="https://i.imgur.com/aznQh7O.png" width="96" style="border-radius:24px;box-shadow:0 2px 8px #ff880033;">
+                <h2 style="color:#223354;font-family:'Inter',sans-serif;margin-top:16px;">Bienvenido a <span style="color:#FF8800;">Dividends Up!</span></h2>
+                <p style="color:#6B778C;font-size:1.12em;margin-bottom:36px;">
+                    Tu plataforma para Seguimiento de Portafolio y Análisis Financiero Profesional.
+                </p>
+            </div>
+            """, unsafe_allow_html=True
+        )
         flow = Flow.from_client_config(
-            {"web": google_cfg},
-            scopes=[
-                "openid",
-                "https://www.googleapis.com/auth/userinfo.email",
-                "https://www.googleapis.com/auth/userinfo.profile",
-            ],
-            state=st.session_state.get("oauth_state"),
-            redirect_uri=google_cfg["redirect_uri"],
+            {
+                "web": {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uris": [redirect_uri],
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                }
+            },
+            scopes=scopes,
+            redirect_uri=redirect_uri,
+        )
+        auth_url, _ = flow.authorization_url(
+            prompt='consent',
+            access_type='offline',
+            include_granted_scopes='true'
+        )
+        st.markdown(
+            f"""
+            <div style="display:flex;justify-content:center;margin-top:32px">
+              <a href="{auth_url}">
+                <button style="
+                    font-size:1.15rem;
+                    padding:0.85em 2.2em;
+                    background:#FF8800;
+                    color:#fff;
+                    border:none;
+                    border-radius:10px;
+                    font-family:'Inter',sans-serif;
+                    font-weight:600;
+                    box-shadow:0 2px 8px #ff880033;
+                    cursor:pointer;
+                    transition:background .14s;
+                " 
+                onmouseover="this.style.background='#de6a00';"
+                onmouseout="this.style.background='#FF8800';"
+                >
+                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" width="24" style="vertical-align:middle;margin-right:10px;margin-bottom:4px">Iniciar sesión con Google
+                </button>
+              </a>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.stop()
+    else:
+        code = query_params["code"]
+        if isinstance(code, list):
+            code = code[0]
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uris": [redirect_uri],
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                }
+            },
+            scopes=scopes,
+            redirect_uri=redirect_uri,
         )
         flow.fetch_token(code=code)
+        credentials = flow.credentials
+
         resp = requests.get(
-            "https://www.googleapis.com/oauth2/v1/userinfo",
-            params={"access_token": flow.credentials.token},
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {credentials.token}"},
         )
-        if resp.status_code != 200:
-            st.error("Error obteniendo datos de usuario.")
-            st.stop()
-        info = resp.json()
-        email = info.get("email")
-        name  = info.get("name")
-        if not email:
-            st.error("No se obtuvo correo del usuario.")
-            st.stop()
-
-        # 3. Registrar / actualizar en BD y en sesión
-        upsert_user(
-            email,
-            nombre=name,
-            fecha_registro=datetime.datetime.now().isoformat()
-        )
-        st.session_state["user_db"] = get_user_by_email(email)
-
-        # 4. Limpiar params y recargar para que ya entre como ‘logged in’
-        st.experimental_set_query_params()
+        user_info = resp.json()
+        email = user_info.get("email")
+        nombre = user_info.get("name", "")
+        # Sincroniza con SQLite
+        user = get_user_by_email(email)
+        if not user:
+            from .db import sqlite3, DB_PATH
+            conn = sqlite3.connect(DB_PATH)
+            cur = conn.cursor()
+            cur.execute("INSERT INTO usuarios (email, nombre) VALUES (?, ?)", (email, nombre))
+            conn.commit()
+            conn.close()
+            user = get_user_by_email(email)
+        st.session_state["google_token"] = credentials.token
+        st.session_state["user"] = email
+        st.session_state["user_db"] = user
+        st.query_params.clear()
         st.experimental_rerun()
-        return False
-
-    # Ya está logueado
     return True
 
+def is_admin():
+    user = st.session_state.get("user_db")
+    return user and user[3] == "admin"  # tipo_plan columna 3
 
-def get_nombre_usuario() -> str | None:
-    """Devuelve el nombre del usuario para mostrar en pantalla."""
-    u = st.session_state.get("user_db")
-    # la tupla es (id, email, nombre, tipo_plan, api_key, fecha_expiracion, fecha_registro)
-    if u and len(u) >= 3:
-        return u[2]
-    return None
+def is_premium():
+    user = st.session_state.get("user_db")
+    if user and user[3] == "premium":
+        exp = user[5]
+        if exp:
+            return exp > str(datetime.date.today())
+        return True
+    return False
 
+def is_free():
+    user = st.session_state.get("user_db")
+    return user and user[3] == "free"
 
-def get_tipo_plan() -> str:
-    """Devuelve el tipo de cuenta (free/premium/admin)."""
-    u = st.session_state.get("user_db")
-    if u and len(u) >= 4 and u[3]:
-        return u[3]
-    return "free"
+def logout_button() -> None:
+    """Render a single logout button in the sidebar."""
+    if "user" not in st.session_state:
+        return
+    if not st.session_state.get("logout_btn_rendered"):
+        if st.sidebar.button("Cerrar sesión", key="logout_btn"):
+            st.session_state.clear()
+            st.experimental_rerun()
+        st.session_state["logout_btn_rendered"] = True
 
+def get_nombre_usuario():
+    user = st.session_state.get("user_db")
+    return user[2] if user and len(user) > 2 else ""  # columna nombre
 
-def logout_button():
-    """Botón que limpia la sesión y recarga la app."""
-    if st.sidebar.button("🚪 Cerrar sesión"):
-        st.session_state.clear()
+def get_tipo_plan():
+    user = st.session_state.get("user_db")
+    return user[3] if user and len(user) > 3 else ""
+
+def guardar_api_key_free(api_key):
+    user = st.session_state.get("user_db")
+    if user and user[3] == "free":
+        from .db import set_user_api_key
+        set_user_api_key(user[1], api_key)
+        # Refresca el user_db actualizado
+        from .db import get_user_by_email
+        st.session_state["user_db"] = get_user_by_email(user[1])
+
+def ensure_api_key() -> bool:
+    """Return True if the logged user has a Yahoo Finance API key."""
+    user = st.session_state.get("user_db")
+    if not user:
+        return False
+    if user[4]:
+        return True
+    st.write("### 🎫 API-Key requerida")
+    api = st.text_input(
+        "Introduce tu clave de Yahoo Finance",
+        key="yf_key_input",
+        placeholder="p-xxxxxxxxxxxxxxxx",
+    )
+    if st.button("Guardar API-Key", key="save_key_btn"):
+        from .db import upsert_user, get_user_by_email
+
+        upsert_user(user[1], api_key=api)
+        st.session_state["user_db"] = get_user_by_email(user[1])
+        st.success("¡Clave guardada!")
         st.experimental_rerun()
+    return False

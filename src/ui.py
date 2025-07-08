@@ -1,34 +1,139 @@
-# src/ui.py
+# ╔═════════════  Coke-App v0.4  (logo, sector/industria, resumen-IA, UI móvil) ═════════════╗
+# 1) IMPORTS & CONFIG
+import os, textwrap
 import streamlit as st
+st.set_page_config(layout="wide")
+from .auth import (
+    get_nombre_usuario,
+    get_tipo_plan,
+    is_free,
+    guardar_api_key_free,
+    logout_button,
+)
+import pandas as pd, plotly.graph_objects as go, plotly.express as px, numpy as np
 import yfinance as yf
-from .services.yf_client import safe_history, history_resiliente, get_logo_url
-from .auth import get_nombre_usuario
-import textwrap
+from .services.yf_client import YF_SESSION, safe_history, history_resiliente, get_logo_url
+from .services.cache import cache_data
+
 
 def render():
-    # ─── Fuentes y CSS general ────────────────────────────────────────────────────
+     
+    # ───── 1-A  page config (¡debe ser la PRIMERA llamada st.*!) ──────────────────
+
+    # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
     st.markdown(
-        """
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-        <style>
-          body, .stApp {
-              font-family: 'Inter', sans-serif;
-              background: #FFFFFF;
-              color: #222B45;
-          }
-        </style>
-        """,
+    """
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+    body, .stApp {
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background: #FFFFFF;
+        color: #222B45;
+    }
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background: #F6F7FA;
+        border-radius: 16px 0 0 16px;
+        box-shadow: 2px 0 6px #e3e7ed44;
+    }
+    /* Botones principales */
+    .stButton>button {
+        background: #FF8800; /* Naranja principal */
+        color: #fff;
+        border-radius: 8px;
+        font-weight: 600;
+        border: none;
+        padding: 0.6em 1.2em;
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        transition: background 0.2s;
+    }
+    .stButton>button:hover {
+        background: #de6a00;
+        color: #fff;
+    }
+    /* Inputs, select, etc */
+    .stTextInput>div>input, .stSelectbox>div>div>div>input {
+        border-radius: 8px;
+        border: 1px solid #E3E7ED;
+        background: #FFF;
+        padding: 0.5em;
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+    /* Tarjetas (cards), expander, tabs */
+    .stDataFrameContainer, .stExpander, .stTabs, .stCard {
+        border-radius: 16px;
+        box-shadow: 0 2px 12px #e3e7ed29;
+        background: #FFF;
+    }
+    /* Títulos */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        color: #223354;
+        font-weight: 700;
+    }
+    /* Gráficos Plotly y otros acentos */
+    .js-plotly-plot .main-svg {
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+    # ╔═════════════ 3) HELPERS  (logo y resumen IA) ═════════════════════════════════════════════
+    @cache_data(show_spinner="💬 Traduciendo y resumiendo…", ttl=60 * 60 * 24)
+    def resumen_es(short_desc_en: str) -> str:
+        """Resumen en español usando OpenAI (requiere OPENAI_API_KEY en Secrets)."""
+        try:
+            import openai, os  # sólo si el usuario puso su clave
+
+            openai.api_key = st.secrets["OPENAI_API_KEY"]
+            prompt = textwrap.dedent(
+                f"""
+                Resume al español en máximo 120 palabras, tono divulgativo,
+                el siguiente texto EXPLICANDO qué hace la empresa.\n\n{short_desc_en}
+            """
+            )
+            rsp = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=180,
+                temperature=0.5,
+            )
+            return rsp.choices[0].message.content.strip()
+        except Exception:
+            return "Resumen no disponible"
+
+    # ╔═════════════ Saludo y API-Key free ════════════════════════════════════
+    st.markdown(
+        f"<h3 style='text-align:center;'>Hola, {get_nombre_usuario()} 👋</h3>",
         unsafe_allow_html=True,
     )
 
-    # ╔═════════ Saludo centrado ════════════════════════════════════════════════════
-    nombre = get_nombre_usuario() or ""
-    st.markdown(
-        f"<h3 style='text-align:center; margin-top:1rem;'>Hola, {nombre} 👋</h3>",
-        unsafe_allow_html=True,
-    )
+    if is_free():
+        usuario = st.session_state["user_db"]
+        if not usuario[4]:
+            with st.container():
+                st.write("### 🎫 API-Key requerida")
+                api = st.text_input(
+                    "Introduce tu clave de Yahoo Finance",
+                    placeholder="p-xxxxxxxxxxxxxxxx",
+                )
+                if st.button("Guardar API-Key"):
+                    guardar_api_key_free(api)
+                    st.success("¡Clave guardada!")
+                    st.experimental_rerun()
+            st.stop()
 
-    # ╔═════════ Pestañas principales ═══════════════════════════════════════════════
+    with st.sidebar:
+        st.markdown(
+            f"👤 **{get_nombre_usuario()}**  \nPlan: **{get_tipo_plan()}**"
+        )
+        st.divider()
+        logout_button()
+     
+    # ╔═════════════ 4) IU PRINCIPAL  ════════════════════════════════════════════════════════════
+    # Tabs de alto nivel
     tabs = st.tabs(
         [
             "Valoración y Análisis Financiero",
@@ -38,7 +143,6 @@ def render():
             "Calculadora de Interés Compuesto",
         ]
     )
-
     # ─── Tab 0 ───────────────────────────────────────────────────────────────────────────────────
     with tabs[0]:
         ########################  ENTRADAS  ######################################################

@@ -1,7 +1,7 @@
 import streamlit as st
 from google_auth_oauthlib.flow import Flow
 import requests
-from .db import init_db, get_user_by_email, update_user_plan, set_user_api_key
+from .db import init_db, get_user_by_email
 import datetime
 
 init_db()
@@ -150,16 +150,6 @@ def is_free():
     user = st.session_state.get("user_db")
     return user and user[3] == "free"
 
-def logout_button() -> None:
-    """Render a single logout button in the sidebar."""
-    if "user" not in st.session_state:
-        return
-    if not st.session_state.get("logout_btn_rendered"):
-        if st.sidebar.button("Cerrar sesión", key="logout_btn"):
-            st.session_state.clear()
-            st.experimental_rerun()
-        st.session_state["logout_btn_rendered"] = True
-
 def get_nombre_usuario():
     user = st.session_state.get("user_db")
     return user[2] if user and len(user) > 2 else ""  # columna nombre
@@ -168,33 +158,9 @@ def get_tipo_plan():
     user = st.session_state.get("user_db")
     return user[3] if user and len(user) > 3 else ""
 
-def guardar_api_key_free(api_key):
-    user = st.session_state.get("user_db")
-    if user and user[3] == "free":
-        from .db import set_user_api_key
-        set_user_api_key(user[1], api_key)
-        # Refresca el user_db actualizado
-        from .db import get_user_by_email
-        st.session_state["user_db"] = get_user_by_email(user[1])
-
-def ensure_api_key() -> bool:
-    """Return True if the logged user has a Yahoo Finance API key."""
-    user = st.session_state.get("user_db")
-    if not user:
-        return False
-    if user[4]:
-        return True
-    st.write("### 🎫 API-Key requerida")
-    api = st.text_input(
-        "Introduce tu clave de Yahoo Finance",
-        key="yf_key_input",
-        placeholder="p-xxxxxxxxxxxxxxxx",
-    )
-    if st.button("Guardar API-Key", key="save_key_btn"):
-        from .db import upsert_user, get_user_by_email
-
-        upsert_user(user[1], api_key=api)
-        st.session_state["user_db"] = get_user_by_email(user[1])
-        st.success("¡Clave guardada!")
-        st.experimental_rerun()
-    return False
+def logout_button():
+    if "user" in st.session_state:
+        if st.button("Cerrar sesión", key="logout_btn"):
+            for k in list(st.session_state.keys()):
+                del st.session_state[k]
+            st.experimental_rerun()

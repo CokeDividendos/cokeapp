@@ -2,6 +2,14 @@
 # 1) IMPORTS & CONFIG
 import os, textwrap
 import streamlit as st
+st.set_page_config(layout="wide")
+from .auth import (
+    get_nombre_usuario,
+    get_tipo_plan,
+    is_free,
+    guardar_api_key_free,
+    logout_button,
+)
 import pandas as pd, plotly.graph_objects as go, plotly.express as px, numpy as np
 import yfinance as yf
 from .services.yf_client import YF_SESSION, safe_history, history_resiliente, get_logo_url
@@ -96,6 +104,34 @@ def render():
         except Exception:
             return "Resumen no disponible"
 
+    # ╔═════════════ Saludo y API-Key free ════════════════════════════════════
+    st.markdown(
+        f"<h3 style='text-align:center;'>Hola, {get_nombre_usuario()} 👋</h3>",
+        unsafe_allow_html=True,
+    )
+
+    if is_free():
+        usuario = st.session_state["user_db"]
+        if not usuario[4]:
+            with st.container():
+                st.write("### 🎫 API-Key requerida")
+                api = st.text_input(
+                    "Introduce tu clave de Yahoo Finance",
+                    placeholder="p-xxxxxxxxxxxxxxxx",
+                )
+                if st.button("Guardar API-Key"):
+                    guardar_api_key_free(api)
+                    st.success("¡Clave guardada!")
+                    st.experimental_rerun()
+            st.stop()
+
+    with st.sidebar:
+        st.markdown(
+            f"👤 **{get_nombre_usuario()}**  \nPlan: **{get_tipo_plan()}**"
+        )
+        st.divider()
+        logout_button()
+     
     # ╔═════════════ 4) IU PRINCIPAL  ════════════════════════════════════════════════════════════
     # Tabs de alto nivel
     tabs = st.tabs(

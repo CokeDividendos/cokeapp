@@ -1,10 +1,14 @@
 # src/ui.py
 import streamlit as st
 from .auth import get_nombre_usuario
-import pandas as pd, numpy as np, plotly.express as px, plotly.graph_objects as go
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
 import yfinance as yf
 from .services.yf_client import safe_history, history_resiliente, get_logo_url
 from .services.cache import cache_data
+import textwrap
 
 def render():
     # ─── Fuentes y CSS general ────────────────────────────────────────────────────
@@ -12,56 +16,24 @@ def render():
         """
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
-        body, .stApp {
-            font-family: 'Inter', sans-serif;
-            background: #FFFFFF;
-            color: #222B45;
-        }
+          body, .stApp {
+              font-family: 'Inter', sans-serif;
+              background: #FFFFFF;
+              color: #222B45;
+          }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # ╔═════════════ 3) HELPERS  (logo y resumen IA) ═════════════════════════════════════════════
-    @cache_data(show_spinner="💬 Traduciendo y resumiendo…", ttl=60 * 60 * 24)
-    def resumen_es(short_desc_en: str) -> str:
-        """Resumen en español usando OpenAI (requiere OPENAI_API_KEY en Secrets)."""
-        try:
-            import openai, os  # sólo si el usuario puso su clave
-
-            openai.api_key = st.secrets["OPENAI_API_KEY"]
-            prompt = textwrap.dedent(
-                f"""
-                Resume al español en máximo 120 palabras, tono divulgativo,
-                el siguiente texto EXPLICANDO qué hace la empresa.\n\n{short_desc_en}
-            """
-            )
-            rsp = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=180,
-                temperature=0.5,
-            )
-            return rsp.choices[0].message.content.strip()
-        except Exception:
-            return "Resumen no disponible"
-
-    # ╔═════════════ Saludo de Usuario ═════════════════════════════════════════════════
+    # ╔═════════ Saludo centrado ════════════════════════════════════════════════════
+    nombre = get_nombre_usuario() or ""
     st.markdown(
-        f"<h3 style='text-align:center;'>Hola, {get_nombre_usuario()} 👋</h3>",
+        f"<h3 style='text-align:center; margin-top:1rem;'>Hola, {nombre} 👋</h3>",
         unsafe_allow_html=True,
     )
 
-    # ─── Sidebar ───────────────────────────────────────────────────────────────────
-    with st.sidebar:
-        st.markdown(
-            f"👤 **{get_nombre_usuario()}**  \nPlan: **{get_tipo_plan()}**"
-        )
-        st.divider()
-        logout_button()
-     
-    # ╔═════════════ 4) IU PRINCIPAL  ════════════════════════════════════════════════════════════
-    # Tabs de alto nivel
+    # ╔═════════ Pestañas principales ═══════════════════════════════════════════════
     tabs = st.tabs(
         [
             "Valoración y Análisis Financiero",
@@ -71,6 +43,7 @@ def render():
             "Calculadora de Interés Compuesto",
         ]
     )
+
     # ─── Tab 0 ───────────────────────────────────────────────────────────────────────────────────
     with tabs[0]:
         ########################  ENTRADAS  ######################################################

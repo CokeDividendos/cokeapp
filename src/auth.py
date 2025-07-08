@@ -47,7 +47,7 @@ def login_required() -> bool:
     if "user_db" not in st.session_state:
         params = st.experimental_get_query_params()
 
-        # 1) Sin código: pedir permiso
+        # 1) Sin 'code': pedir permiso
         if "code" not in params:
             flow = Flow.from_client_config(
                 client_config,
@@ -90,7 +90,7 @@ def login_required() -> bool:
             )
             return False
 
-        # 2) Con código: intercambiar token y obtener info
+        # 2) Con 'code': intercambio y obtención de datos
         code = params["code"][0]
         flow = Flow.from_client_config(
             client_config,

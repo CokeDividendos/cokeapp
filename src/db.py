@@ -4,6 +4,17 @@ import datetime
 
 DB_PATH = Path(__file__).parent / "cokeapp.sqlite"
 
+def listar_usuarios():
+    import sqlite3
+    from pathlib import Path
+    DB_PATH = Path(__file__).parent / "cokeapp.sqlite"
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, email, nombre FROM usuarios")
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+    
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()

@@ -1,34 +1,32 @@
 # src/ui.py
-# ╔═════════════  Coke-App v0.4  (logo, sector/industria, resumen-IA, UI móvil) ═════════════╗
-# 1) IMPORTS & CONFIG
-import os, textwrap
 import streamlit as st
-from .auth import get_nombre_usuario, get_tipo_plan, logout_button
-import pandas as pd, plotly.graph_objects as go, plotly.express as px, numpy as np
+from .auth import get_nombre_usuario, get_tipo_plan
+import pandas as pd, numpy as np, plotly.express as px, plotly.graph_objects as go
 import yfinance as yf
-from .services.yf_client import YF_SESSION, safe_history, history_resiliente, get_logo_url
+from .services.yf_client import safe_history, history_resiliente, get_logo_url
 from .services.cache import cache_data
-
 
 def render():
      
-    # ───── 1-A  page config (¡debe ser la PRIMERA llamada st.*!) ──────────────────
-
-    # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
+    ## ─── Fuentes y CSS general ────────────────────────────────────────────────────
     st.markdown(
         """
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
         body, .stApp {
-            font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-family: 'Inter', sans-serif;
             background: #FFFFFF;
             color: #222B45;
         }
-        /* Sidebar */
         section[data-testid="stSidebar"] {
             background: #F6F7FA;
             border-radius: 16px 0 0 16px;
             box-shadow: 2px 0 6px #e3e7ed44;
+        }
+        /* Estilo del botón “Cerrar sesión” */
+        button[data-key="logout_btn"] > div {
+            background-color: #FF8800 !important;
+            color: white !important;
         }
         </style>
         """,

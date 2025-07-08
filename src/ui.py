@@ -8,7 +8,6 @@ from .auth import get_nombre_usuario
 from .services.yf_client import YF_SESSION, safe_history, history_resiliente, get_logo_url
 from .services.cache import cache_data
 
-st.set_page_config(layout="wide")
 
 def render():
     # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────

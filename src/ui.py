@@ -1,5 +1,7 @@
 # src/ui.py
 import streamlit as st
+import yfinance as yf
+from .services.yf_client import safe_history, history_resiliente, get_logo_url
 from .auth import get_nombre_usuario
 import textwrap
 

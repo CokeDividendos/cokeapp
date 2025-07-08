@@ -1,14 +1,13 @@
 # src/ui.py
 import streamlit as st
-from .auth import get_nombre_usuario, get_tipo_plan
+from .auth import get_nombre_usuario
 import pandas as pd, numpy as np, plotly.express as px, plotly.graph_objects as go
 import yfinance as yf
 from .services.yf_client import safe_history, history_resiliente, get_logo_url
 from .services.cache import cache_data
 
 def render():
-     
-    ## ─── Fuentes y CSS general ────────────────────────────────────────────────────
+    # ─── Fuentes y CSS general ────────────────────────────────────────────────────
     st.markdown(
         """
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -17,16 +16,6 @@ def render():
             font-family: 'Inter', sans-serif;
             background: #FFFFFF;
             color: #222B45;
-        }
-        section[data-testid="stSidebar"] {
-            background: #F6F7FA;
-            border-radius: 16px 0 0 16px;
-            box-shadow: 2px 0 6px #e3e7ed44;
-        }
-        /* Estilo del botón “Cerrar sesión” */
-        button[data-key="logout_btn"] > div {
-            background-color: #FF8800 !important;
-            color: white !important;
         }
         </style>
         """,

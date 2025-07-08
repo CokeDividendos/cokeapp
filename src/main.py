@@ -10,12 +10,6 @@ import streamlit as st
 
 import src.db as db  # Ajusta el import si tu estructura de carpetas es diferente
 
-if st.sidebar.button("Ver usuarios registrados"):
-    usuarios = db.listar_usuarios()  # Asegúrate de tener la función listar_usuarios en src/db.py
-    st.sidebar.write("Usuarios registrados:")
-    for u in usuarios:
-        st.sidebar.write(f"ID: {u[0]}, Email: {u[1]}, Nombre: {u[2]}")
-        
 def main():
     # 1. Configuración de página en modo wide
     st.set_page_config(layout="wide")
@@ -27,7 +21,13 @@ def main():
                 "<h2 style='color:#223354;margin-bottom:1em;'>Menú</h2>",
                 unsafe_allow_html=True
             )
-
+            if st.sidebar.button("Ver usuarios registrados"):
+            usuarios = db.listar_usuarios()  # Asegúrate de tener la función listar_usuarios en src/db.py
+            st.sidebar.write("Usuarios registrados:")
+            for u in usuarios:
+            st.sidebar.write(f"ID: {u[0]}, Email: {u[1]}, Nombre: {u[2]}")
+        
+            
             # Botones con estilo profesional
             section = st.session_state.get("selected_section", "Valoración y Análisis Financiero")
             btn1 = st.button("Valoración y Análisis Financiero", use_container_width=True, key="btn_analisis")

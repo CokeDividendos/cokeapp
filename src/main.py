@@ -1,10 +1,10 @@
-from .auth import (
+from src.auth import (
     login_required,
     get_nombre_usuario,
     get_tipo_plan,
     logout_button,
 )
-from .ui import render
+from src.ui import render
 import streamlit as st
 import src.db as db
 
@@ -16,7 +16,6 @@ def main():
                 "<h2 style='color:#223354;margin-bottom:1em;'>Menú</h2>",
                 unsafe_allow_html=True
             )
-            # Debug temporal de usuario — puedes quitarlo luego
             st.write("Usuario actual:", st.session_state.get("user"))
             st.write("Registro DB:", st.session_state.get("user_db"))
 

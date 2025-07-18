@@ -1,9 +1,26 @@
 import streamlit as st
 from google_auth_oauthlib.flow import Flow
 import requests
-from .db import init_db, get_user_by_email, sqlite3, DB_PATH
+import os
+from src.db import init_db, get_user_by_email, sqlite3, DB_PATH
 
 init_db()
+
+def get_google_secrets():
+    """
+    Devuelve las credenciales de Google desde variables de entorno (Render) o st.secrets (local/Cloud).
+    Requiere que existan: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI como variables env en Render.
+    """
+    keys = ("client_id", "client_secret", "redirect_uri")
+    if "google" in st.secrets:
+        google_secrets = st.secrets["google"]
+        return {key: google_secrets[key] for key in keys}
+    # Render: lee de variables de entorno
+    return {
+        "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
+        "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
+        "redirect_uri": os.environ.get("GOOGLE_REDIRECT_URI"),
+    }
 
 def login_required():
     # Si ya hay usuario en sesión, úsalo directamente
@@ -16,13 +33,10 @@ def login_required():
         st.experimental_rerun()
 
     # Configuración Google
-    if "google" not in st.secrets:
-        st.error("No se encontró la sección [google] en los secrets de Streamlit Cloud.")
-        st.stop()
-    google_secrets = st.secrets["google"]
+    google_secrets = get_google_secrets()
     for key in ("client_id", "client_secret", "redirect_uri"):
-        if key not in google_secrets:
-            st.error(f"Falta '{key}' en secrets. Por favor, revisa en Settings > Secrets de Streamlit Cloud.")
+        if not google_secrets.get(key):
+            st.error(f"Falta '{key}' en variables de entorno o secrets. Configura en Render (Environment) o en .streamlit/secrets.toml.")
             st.stop()
     client_id = google_secrets["client_id"]
     client_secret = google_secrets["client_secret"]

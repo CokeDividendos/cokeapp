@@ -1047,7 +1047,7 @@ def render():
             try:
                 bs_t = ticker_data.balance_sheet.transpose().apply(pd.to_numeric, errors="coerce")
                 bs_t.index = bs_t.index.year
-
+            
                 req = [
                     "Total Assets",
                     "Total Liabilities Net Minority Interest",
@@ -1057,6 +1057,7 @@ def render():
                     st.warning("Faltan columnas clave para la vista de balance.")
                 else:
                     df_balance = bs_t[req].replace([np.inf, -np.inf], np.nan).dropna(how="all")
+                    fig_balance = go.Figure()  # <--- CORREGIDO: inicializa la figura aquí
                     fig_balance.add_trace(
                         go.Scatter(
                             x=df_balance.index,
@@ -1094,7 +1095,6 @@ def render():
                     st.plotly_chart(fig_balance, use_container_width=True, key="plotly_chart_balance")
             except Exception as e:
                 st.warning(f"No se pudo generar el gráfico del Balance: {e}")
-
             # ------------------------------------------------------------------
             # Tabla completa
             # ------------------------------------------------------------------

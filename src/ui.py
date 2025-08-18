@@ -1057,6 +1057,7 @@ def render():
                     st.warning("Faltan columnas clave para la vista de balance.")
                 else:
                     df_balance = bs_t[req].replace([np.inf, -np.inf], np.nan).dropna(how="all")
+                    fig_balance = go.figure()
                     fig_balance.add_trace(
                         go.Scatter(
                             x=df_balance.index,

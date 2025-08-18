@@ -1044,8 +1044,9 @@ def render():
             # 4-D  Visión 3-líneas (Assets / Liabilities / Equity)
             # ------------------------------------------------------------------
             st.subheader("Evolución del Balance")
-            fig_balance = go.Figure()
+            
             try:
+                fig_balance = go.Figure()
                 bs_t = ticker_data.balance_sheet.transpose().apply(pd.to_numeric, errors="coerce")
                 bs_t.index = bs_t.index.year
 

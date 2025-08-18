@@ -1044,6 +1044,7 @@ def render():
             # 4-D  Visión 3-líneas (Assets / Liabilities / Equity)
             # ------------------------------------------------------------------
             st.subheader("Evolución del Balance")
+            fig_balance = go.Figure()
             try:
                 bs_t = ticker_data.balance_sheet.transpose().apply(pd.to_numeric, errors="coerce")
                 bs_t.index = bs_t.index.year
@@ -1092,6 +1093,7 @@ def render():
                         height=450,
                         margin=dict(l=30, r=30, t=60, b=30),
                     )
+                if fig_balance.data: 
                     st.plotly_chart(fig_balance, use_container_width=True, key="plotly_chart_balance")
             except Exception as e:
                 st.warning(f"No se pudo generar el gráfico del Balance: {e}")

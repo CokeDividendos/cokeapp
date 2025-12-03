@@ -1561,17 +1561,22 @@ def render():
         
             ratios_list.append(row)
         
-        # Crear DataFrame e imprimirlo
+        # Crear el DataFrame con los ratios, indexar por año y redondear a 2 decimales
         df_ratios = pd.DataFrame(ratios_list).set_index("Año").round(2)
         
         
-        # Transponer: ratios en filas, años en columnas
-        df_ratios_T = df_ratios.transpose()
+        # Transponer: ratios en filas, años en columnas y convertir índice a columna 'Ratio'
+        df_ratios_T = df_ratios.transpose().reset_index().rename(columns={'index': 'Ratio'})
 
         
         # Mover el índice a una columna llamada 'Ratio'
         df_ratios_T = df_ratios_T.reset_index().rename(columns={'index': 'Ratio'})
+
+        # Asegurar que no existan columnas o ratios duplicados
+        df_ratios_T = df_ratios_T.loc[:, ~df_ratios_T.columns.duplicated()]
+        df_ratios_T = df_ratios_T.drop_duplicates(subset=['Ratio'])
         
+                
         # Definir listas de categorías para colorear la columna 'Ratio'
         rat_liquidez = ["Razón Corriente", "Razón Ácida", "Capital de trabajo"]
         rat_endeudamiento = ["Deuda/Patrimonio", "Deuda/Activos"]
@@ -1595,13 +1600,11 @@ def render():
         # Aplicar color a la columna 'Ratio' y formato de 2 decimales a todas las demás
         styler = (
             df_ratios_T
-            .reset_index()
-            .rename(columns={"index": "Ratio"})
             .style
-            .applymap(color_ratio, subset=["Ratio"])
-            .format(precision=2, na_rep="–")  # formato con 2 decimales y guion para valores faltantes
+            .applymap(color_ratio, subset=['Ratio'])
+            .format(precision=2, na_rep="–")  # mostrar max. 2 decimales
         )
-        
+
                 
         # Mostrar la tabla en Streamlit
         st.markdown("#### Tabla de Ratios (Años en columnas)")

@@ -1452,6 +1452,16 @@ def render():
         # Sección: Análisis Razonado
         # ==========================
         st.markdown("## 📊 Análisis Razonado")
+
+        st.markdown(
+            "<em>Ratios de liquidez en <span style='color:green'>verde</span>, "
+            "endeudamiento en <span style='color:blue'>azul</span>, "
+            "gestión en <span style='color:hotpink'>rosado</span>, "
+            "rentabilidad en <span style='color:darkorange'>naranja</span> "
+            "y otros en blanco.</em>",
+            unsafe_allow_html=True,
+        )
+
         
         # Convertimos las tablas a formato numérico y las indexamos por año
         bs_t = ticker_data.balance_sheet.transpose().apply(pd.to_numeric, errors="coerce").dropna(how="all")
@@ -1553,6 +1563,9 @@ def render():
         
         # Crear DataFrame e imprimirlo
         df_ratios = pd.DataFrame(ratios_list).set_index("Año")
+        
+        df_ratios = df_ratios.round(2)
+        
         # Transponer: ratios en filas, años en columnas
         df_ratios_T = df_ratios.transpose()
         
@@ -1587,10 +1600,6 @@ def render():
         st.table(styler)
 
 
-
-
-        # --------------------------
-        # Sección: Precios Objetivo (con entrada de Yield Deseado aquí)
         # --------------------------
         # Sección: Precios Objetivo (con entrada de Yield Deseado aquí)
         # --------------------------

@@ -89,7 +89,7 @@ def render():
 
     # ╔═════════════ Saludo ════════════════════════════════════
     st.markdown(
-        f"<h3 style='text-align:center;'>Hola, {get_nombre_usuario()} 👋</h3>",
+        "<h3 style='text-align:center;'>Hola 👋</h3>",
         unsafe_allow_html=True,
     )
 

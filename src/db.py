@@ -33,8 +33,8 @@ def init_db():
     );
     """)
     # ⚠️ Sustituye el correo y el nombre con los tuyos antes de guardar el archivo
-    default_admin_email = cokedividendos@gmail.com
-    default_admin_nombre = Coke
+    default_admin_email = "cokedividendos@gmail.com"
+    default_admin_nombre = "Coke"
     cur.execute("SELECT * FROM usuarios WHERE email = ?", (default_admin_email,))
     if not cur.fetchone():
         cur.execute("""

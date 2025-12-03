@@ -32,7 +32,7 @@ def login_required():
     """Gestión del flujo de login con Google y control de acceso."""
     # Limpia parámetros de error OAuth
     if "error" in st.query_params:
-        st.experimental_set_query_params()
+        st.query_params.clear()
         st.experimental_rerun()
 
     # Lee credenciales de Google
@@ -79,7 +79,7 @@ def login_required():
         except Exception:
             st.error("Hubo un problema al validar el código de Google. Intenta nuevamente.")
             # Limpiar params y volver
-            st.experimental_set_query_params()
+            st.query_params.clear()
             st.stop()
 
         credentials = flow.credentials
@@ -91,7 +91,7 @@ def login_required():
         )
         if resp.status_code != 200:
             st.error("No se pudo obtener información de tu cuenta de Google.")
-            st.experimental_set_query_params()
+            st.query_params.clear()
             st.stop()
         user_info = resp.json()
         email = user_info.get("email")
@@ -108,7 +108,7 @@ def login_required():
             st.error("⚠️ Tu correo no está registrado o no tienes permiso para acceder.\n\n"
                      "Contacta al administrador para solicitar acceso.")
             # Limpiar query params para evitar reintentar el mismo código
-            st.experimental_set_query_params()
+            st.query_params.clear()
             st.stop()
 
         # Actualiza el nombre en la BD por si cambió
@@ -123,7 +123,7 @@ def login_required():
         # Verifica que esté habilitado
         if not esta_habilitado(user):
             st.error("⚠️ Tu suscripción ha expirado o no tienes acceso.")
-            st.experimental_set_query_params()
+            st.query_params.clear()
             st.stop()
 
         # Limpia la session_state y guarda los datos del nuevo usuario
@@ -133,7 +133,7 @@ def login_required():
         st.session_state["user_db"] = user
 
         # Limpia los parámetros de la URL y recarga
-        st.experimental_set_query_params()
+        st.query_params.clear()
         st.experimental_rerun()
         return False
 
@@ -199,5 +199,5 @@ def logout_button():
     if st.button("Cerrar sesión", key="logout_btn"):
         st.session_state.clear()
         # Limpia query params para no reutilizar el código anterior
-        st.experimental_set_query_params()
+        st.query_params.clear()
         st.experimental_rerun()

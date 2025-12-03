@@ -1592,9 +1592,17 @@ def render():
             else:
                 return ''  # Deja color por defecto (blanco) para 'Otros'
         
-        # Aplicar estilos solo a la columna 'Ratio'
-        styler = df_ratios_T.style.applymap(color_ratio, subset=['Ratio'])
+        # Aplicar color a la columna 'Ratio' y formato de 2 decimales a todas las demás
+        styler = (
+            df_ratios_T
+            .reset_index()
+            .rename(columns={"index": "Ratio"})
+            .style
+            .applymap(color_ratio, subset=["Ratio"])
+            .format(precision=2, na_rep="–")  # formato con 2 decimales y guion para valores faltantes
+        )
         
+                
         # Mostrar la tabla en Streamlit
         st.markdown("#### Tabla de Ratios (Años en columnas)")
         st.table(styler)

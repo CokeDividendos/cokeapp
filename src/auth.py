@@ -3,22 +3,39 @@ import streamlit as st
 from google_auth_oauthlib.flow import Flow
 import requests
 from .db import init_db, sqlite3, DB_PATH
+import datetime
 
 init_db()
 
+def esta_habilitado(user) -> bool:
+    """
+    Lógica de autorización:
+    - user[3] es la columna `tipo_plan` (free, premium, admin).
+    - user[5] es `fecha_expiracion` (puede ser None).
+    Puedes ajustar esta función para solo permitir ciertos tipos o validar fechas.
+    """
+    if not user:
+        return False
+    tipo = user[3] or "free"
+    fecha_expiracion = user[5]
+    if fecha_expiracion:
+        # Si tiene fecha de expiración, comprobar que no esté vencida
+        try:
+            expira = datetime.datetime.fromisoformat(fecha_expiracion)
+            if expira < datetime.datetime.now():
+                return False
+        except Exception:
+            pass
+    return tipo in ("free", "premium", "admin")
+
 def login_required():
-    """
-    Gestiona el flujo de login con Google.
-    - Muestra un botón de login si no hay código OAuth.
-    - Procesa el código OAuth y actualiza la BD y session_state.
-    - Permite múltiples usuarios sin arrastrar el estado del anterior.
-    """
-    # Limpia mensajes de error OAuth
+    """Gestión del flujo de login con Google y control de acceso."""
+    # Limpia parámetros de error OAuth
     if "error" in st.query_params:
-        st.query_params.clear()
+        st.experimental_set_query_params()
         st.experimental_rerun()
 
-    # Credenciales de Google desde secrets
+    # Lee credenciales de Google
     if "google" not in st.secrets:
         st.error("No se encontró la sección [google] en secrets.")
         st.stop()
@@ -38,7 +55,8 @@ def login_required():
     ]
 
     params = st.query_params
-    # Si hay código en la URL, procesa login aunque haya user en sesión (nuevo login)
+
+    # Procesar callback si hay código
     if "code" in params:
         code = params["code"]
         if isinstance(code, list):
@@ -56,7 +74,14 @@ def login_required():
             scopes=scopes,
             redirect_uri=redirect_uri,
         )
-        flow.fetch_token(code=code)
+        try:
+            flow.fetch_token(code=code)
+        except Exception:
+            st.error("Hubo un problema al validar el código de Google. Intenta nuevamente.")
+            # Limpiar params y volver
+            st.experimental_set_query_params()
+            st.stop()
+
         credentials = flow.credentials
 
         # Obtiene info del usuario desde Google
@@ -64,40 +89,59 @@ def login_required():
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {credentials.token}"},
         )
+        if resp.status_code != 200:
+            st.error("No se pudo obtener información de tu cuenta de Google.")
+            st.experimental_set_query_params()
+            st.stop()
         user_info = resp.json()
         email = user_info.get("email")
         nombre = user_info.get("name", "")
 
-        # Actualiza BD: inserta o actualiza nombre
+        # Busca al usuario en la BD (solo permite acceso si ya existe)
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
         cur.execute("SELECT * FROM usuarios WHERE email = ?", (email,))
-        row = cur.fetchone()
-        if row:
-            cur.execute("UPDATE usuarios SET nombre = ? WHERE email = ?", (nombre, email))
-        else:
-            cur.execute("INSERT INTO usuarios (email, nombre) VALUES (?, ?)", (email, nombre))
+        user = cur.fetchone()
+        conn.close()
+
+        if not user:
+            st.error("⚠️ Tu correo no está registrado o no tienes permiso para acceder.\n\n"
+                     "Contacta al administrador para solicitar acceso.")
+            # Limpiar query params para evitar reintentar el mismo código
+            st.experimental_set_query_params()
+            st.stop()
+
+        # Actualiza el nombre en la BD por si cambió
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("UPDATE usuarios SET nombre = ? WHERE email = ?", (nombre, email))
         conn.commit()
         cur.execute("SELECT * FROM usuarios WHERE email = ?", (email,))
         user = cur.fetchone()
         conn.close()
 
-        # Reinicia completamente la session_state y guarda la nueva sesión
+        # Verifica que esté habilitado
+        if not esta_habilitado(user):
+            st.error("⚠️ Tu suscripción ha expirado o no tienes acceso.")
+            st.experimental_set_query_params()
+            st.stop()
+
+        # Limpia la session_state y guarda los datos del nuevo usuario
         st.session_state.clear()
         st.session_state["google_token"] = credentials.token
         st.session_state["user"] = email
         st.session_state["user_db"] = user
 
-        # Limpia parámetros de la URL y recarga
-        st.query_params.clear()
+        # Limpia los parámetros de la URL y recarga
+        st.experimental_set_query_params()
         st.experimental_rerun()
         return False
 
-    # Si ya hay user en sesión y no hay código en la URL, no hay nada más que hacer
+    # Si ya hay usuario en sesión, lo devuelve
     if "user" in st.session_state and "user_db" in st.session_state:
         return True
 
-    # Sin usuario ni código: muestra botón de login
+    # No hay usuario ni código: mostrar botón de login
     flow = Flow.from_client_config(
         {
             "web": {
@@ -151,11 +195,9 @@ def get_tipo_plan():
     return user[3] if user and len(user) > 3 else ""
 
 def logout_button():
-    """Muestra botón 'Cerrar sesión' y limpia completamente la sesión."""
+    """Muestra botón 'Cerrar sesión' y limpia sesión y URL."""
     if st.button("Cerrar sesión", key="logout_btn"):
         st.session_state.clear()
-        try:
-            st.query_params.clear()
-        except Exception:
-            pass
+        # Limpia query params para no reutilizar el código anterior
+        st.experimental_set_query_params()
         st.experimental_rerun()

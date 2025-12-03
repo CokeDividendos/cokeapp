@@ -17,7 +17,7 @@ def render():
     <style>
     body, .stApp {
         font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        background: #FFFFFF;
+        background: #FFFFFF;    
         color: #222B45;
     }
     section[data-testid="stSidebar"] {
@@ -1059,7 +1059,7 @@ def render():
                     st.warning("Faltan columnas clave para la vista de balance.")
                 else:
                     df_balance = bs_t[req].replace([np.inf, -np.inf], np.nan).dropna(how="all")
-                    fig_balance = go.figure()
+                    fig_balance = go.Figure()
                     fig_balance.add_trace(
                         go.Scatter(
                             x=df_balance.index,

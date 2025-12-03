@@ -1564,17 +1564,15 @@ def render():
         # Crear el DataFrame con los ratios, indexar por año y redondear a 2 decimales
         df_ratios = pd.DataFrame(ratios_list).set_index("Año").round(2)
         
-        
         # Transponer: ratios en filas, años en columnas y convertir índice a columna 'Ratio'
         df_ratios_T = df_ratios.transpose().reset_index().rename(columns={'index': 'Ratio'})
 
-        
         # Mover el índice a una columna llamada 'Ratio'
         df_ratios_T = df_ratios_T.reset_index().rename(columns={'index': 'Ratio'})
-
-        # Asegurar que no existan columnas o ratios duplicados
+        
+        # Asegurar que no haya columnas de años duplicadas (pero conservar los nombres de ratio)
         df_ratios_T = df_ratios_T.loc[:, ~df_ratios_T.columns.duplicated()]
-        df_ratios_T = df_ratios_T.drop_duplicates(subset=['Ratio'])
+
         
                 
         # Definir listas de categorías para colorear la columna 'Ratio'
@@ -1602,8 +1600,10 @@ def render():
             df_ratios_T
             .style
             .applymap(color_ratio, subset=['Ratio'])
-            .format(precision=2, na_rep="–")  # mostrar max. 2 decimales
+            .format(precision=2, na_rep="–")
         )
+        st.markdown("#### Tabla de Ratios (Años en columnas)")
+        st.table(styler)
 
                 
         # Mostrar la tabla en Streamlit

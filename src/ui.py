@@ -1564,10 +1564,11 @@ def render():
         # Crear DataFrame e imprimirlo
         df_ratios = pd.DataFrame(ratios_list).set_index("Año")
         
-        df_ratios = df_ratios.round(2)
         
         # Transponer: ratios en filas, años en columnas
         df_ratios_T = df_ratios.transpose()
+
+        df_ratios = df_ratios.round(2)
         
         # Mover el índice a una columna llamada 'Ratio'
         df_ratios_T = df_ratios_T.reset_index().rename(columns={'index': 'Ratio'})

@@ -1555,16 +1555,37 @@ def render():
         df_ratios = pd.DataFrame(ratios_list).set_index("Año")
         # Transponer: ratios en filas, años en columnas
         df_ratios_T = df_ratios.transpose()
+        
+        # Mover el índice a una columna llamada 'Ratio'
+        df_ratios_T = df_ratios_T.reset_index().rename(columns={'index': 'Ratio'})
+        
+        # Definir listas de categorías para colorear la columna 'Ratio'
+        rat_liquidez = ["Razón Corriente", "Razón Ácida", "Capital de trabajo"]
+        rat_endeudamiento = ["Deuda/Patrimonio", "Deuda/Activos"]
+        rat_gestion = ["Rotación de inventarios", "Rotación de activos", "Duración Ctas por Cobrar", "Duración Ctas por Pagar"]
+        rat_rentabilidad = ["ROA (%)", "ROE (%)", "ROIC (%)"]
+        # El resto de ratios se considerarán 'Otros'
+        
+        # Función de estilo para la columna 'Ratio'
+        def color_ratio(val):
+            if val in rat_liquidez:
+                return 'color: green'
+            elif val in rat_endeudamiento:
+                return 'color: blue'
+            elif val in rat_gestion:
+                return 'color: hotpink'
+            elif val in rat_rentabilidad:
+                return 'color: darkorange'
+            else:
+                return ''  # Deja color por defecto (blanco) para 'Otros'
+        
+        # Aplicar estilos solo a la columna 'Ratio'
+        styler = df_ratios_T.style.applymap(color_ratio, subset=['Ratio'])
+        
+        # Mostrar la tabla en Streamlit
         st.markdown("#### Tabla de Ratios (Años en columnas)")
-        st.dataframe(df_ratios_T)
+        st.table(styler)
 
-        st.markdown("### Evolución temporal de cada ratio")
-        for ratio in df_ratios.columns:
-            serie = df_ratios[ratio].dropna()
-            if not serie.empty:
-                st.markdown(f"**{ratio}**")
-                # La serie conserva el índice de años (df_ratios tiene años en su índice)
-                st.line_chart(serie)
 
 
 

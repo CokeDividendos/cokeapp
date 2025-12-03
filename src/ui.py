@@ -1553,8 +1553,20 @@ def render():
         
         # Crear DataFrame e imprimirlo
         df_ratios = pd.DataFrame(ratios_list).set_index("Año")
-        st.markdown("#### Tabla de Ratios")
-        st.dataframe(df_ratios)
+        # Transponer: ratios en filas, años en columnas
+        df_ratios_T = df_ratios.transpose()
+        st.markdown("#### Tabla de Ratios (Años en columnas)")
+        st.dataframe(df_ratios_T)
+
+        st.markdown("### Evolución temporal de cada ratio")
+        for ratio in df_ratios.columns:
+            serie = df_ratios[ratio].dropna()
+            if not serie.empty:
+                st.markdown(f"**{ratio}**")
+                # La serie conserva el índice de años (df_ratios tiene años en su índice)
+                st.line_chart(serie)
+
+
 
         # --------------------------
         # Sección: Precios Objetivo (con entrada de Yield Deseado aquí)

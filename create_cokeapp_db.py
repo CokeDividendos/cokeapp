@@ -8,8 +8,8 @@ DB_PATH = Path(__file__).resolve().parent / "src" / "cokeapp.sqlite"
 # Lista de usuarios permitidos
 usuarios = [
     {
-        "email": cokedividendos@gmail.com,
-        "nombre": Coke,
+        "email": "cokedividendos@gmail.com",
+        "nombre": "Coke",
         "tipo_plan": "admin",
         "fecha_expiracion": None  # No expira
     },

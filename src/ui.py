@@ -1448,6 +1448,114 @@ def render():
             st.markdown("#### Estado de Flujo de Efectivo en detalle")
             st.dataframe(ticker_data.cashflow.iloc[::-1], height=300)
 
+        # ==========================
+        # Sección: Análisis Razonado
+        # ==========================
+        st.markdown("## 📊 Análisis Razonado")
+        
+        # Convertimos las tablas a formato numérico y las indexamos por año
+        bs_t = ticker_data.balance_sheet.transpose().apply(pd.to_numeric, errors="coerce").dropna(how="all")
+        bs_t.index = bs_t.index.year
+        income_t = ticker_data.financials.transpose().apply(pd.to_numeric, errors="coerce").dropna(how="all")
+        income_t.index = income_t.index.year
+        
+        # Series de precios por año (último cierre de cada año)
+        price_data_yearly = price_data["Close"].resample("Y").last()
+        price_data_yearly.index = price_data_yearly.index.year
+        
+        # Acciones en circulación por año (si está disponible)
+        try:
+            shares_series = ticker_data.balance_sheet.loc["Ordinary Shares Number"].apply(pd.to_numeric, errors="coerce")
+            shares_series.index = pd.to_datetime(shares_series.index).year
+        except Exception:
+            shares_series = pd.Series()
+        
+        ratios_list = []
+        years = sorted(set(bs_t.index).intersection(income_t.index))
+        for year in years:
+            row = {"Año": year}
+        
+            # ------------------------------------------------------------------
+            # 1. Extracción de datos del Balance (bs_t) e Income Statement (income_t)
+            # ------------------------------------------------------------------
+            def get_bs(colnames):
+                for c in colnames:
+                    if c in bs_t.columns:
+                        return bs_t.at[year, c]
+                return None
+        
+            def get_income(colnames):
+                for c in colnames:
+                    if c in income_t.columns:
+                        return income_t.at[year, c]
+                return None
+        
+            total_assets = get_bs(["Total Assets"])
+            total_liabilities = get_bs(["Total Liabilities Net Minority Interest"])
+            total_equity = get_bs(["Total Equity Gross Minority Interest", "Total Equity"])
+            current_assets = get_bs(["Current Assets", "Total Current Assets"])
+            current_liabilities = get_bs(["Current Liabilities", "Total Current Liabilities"])
+            cash = get_bs(["Cash And Cash Equivalents", "Cash"])
+            receivables = get_bs(["Net Receivables", "Accounts Receivable", "Accounts Receivables"])
+            inventory = get_bs(["Inventory", "Total Inventory"])
+            payables = get_bs(["Accounts Payable", "Account Payables"])
+            total_debt = get_bs(["Total Debt", "Long Term Debt"])
+        
+            revenue = get_income(["Total Revenue", "Revenue"])
+            cost_of_rev = get_income(["Cost Of Revenue", "Cost of Revenue", "Cost Of Goods Sold"])
+            net_income = get_income(["Net Income"])
+        
+            shares = shares_series.get(year) if isinstance(shares_series, pd.Series) else None
+            price = price_data_yearly.get(year)
+        
+            def safe_div(a, b):
+                return a / b if a is not None and b is not None and b != 0 else None
+        
+            # ------------------------------------------------------------------
+            # 2. Cálculo de ratios de liquidez
+            # ------------------------------------------------------------------
+            row["Razón Corriente"] = safe_div(current_assets, current_liabilities)
+            row["Razón Ácida"] = safe_div((cash or 0) + (receivables or 0), current_liabilities)
+            row["Capital de trabajo"] = (current_assets - current_liabilities) if current_assets is not None and current_liabilities is not None else None
+        
+            # ------------------------------------------------------------------
+            # 3. Ratios de endeudamiento
+            # ------------------------------------------------------------------
+            row["Deuda/Patrimonio"] = safe_div(total_liabilities, total_equity)
+            row["Deuda/Activos"] = safe_div(total_liabilities, total_assets)
+        
+            # ------------------------------------------------------------------
+            # 4. Ratios de gestión
+            # ------------------------------------------------------------------
+            row["Rotación de inventarios"] = safe_div(cost_of_rev, inventory)
+            row["Rotación de activos"] = safe_div(revenue, total_assets)
+            row["Duración Ctas por Cobrar"] = safe_div(receivables, revenue) * 365 if receivables is not None and revenue not in [None, 0] else None
+            row["Duración Ctas por Pagar"] = safe_div(payables, cost_of_rev) * 365 if payables is not None and cost_of_rev not in [None, 0] else None
+        
+            # ------------------------------------------------------------------
+            # 5. Ratios de rentabilidad
+            # ------------------------------------------------------------------
+            row["ROA (%)"] = safe_div(net_income, revenue) * 100 if net_income is not None and revenue not in [None, 0] else None
+            row["ROE (%)"] = safe_div(net_income, total_equity) * 100 if net_income is not None and total_equity not in [None, 0] else None
+            capital_invertido = (total_debt + total_equity - (cash or 0)) if total_debt is not None and total_equity is not None else None
+            row["ROIC (%)"] = safe_div(net_income, capital_invertido) * 100 if net_income is not None and capital_invertido not in [None, 0] else None
+        
+            # ------------------------------------------------------------------
+            # 6. Otros ratios
+            # ------------------------------------------------------------------
+            row["Margen de utilidad (%)"] = safe_div(net_income, revenue) * 100 if net_income is not None and revenue not in [None, 0] else None
+            row["Apalancamiento (x)"] = safe_div(total_assets, total_equity)
+            row["Valor libro ajustado"] = safe_div(total_equity, shares)
+            denominator = safe_div((total_assets - total_liabilities), shares) if total_assets is not None and total_liabilities is not None and shares not in [None, 0] else None
+            row["Valor bolsa/libro"] = safe_div(price, denominator) if denominator not in [None, 0] and price is not None else None
+        
+            ratios_list.append(row)
+        
+        # Crear DataFrame e imprimirlo
+        df_ratios = pd.DataFrame(ratios_list).set_index("Año")
+        st.markdown("#### Tabla de Ratios")
+        st.dataframe(df_ratios)
+
         # --------------------------
         # Sección: Precios Objetivo (con entrada de Yield Deseado aquí)
         # --------------------------

@@ -135,8 +135,6 @@ def render():
         if info.get("longBusinessSummary"):
             st.write(resumen_es(info["longBusinessSummary"]))
 
-        ticker_data = get_ticker_data(ticker_input)
-        info = ticker_data.info or {}
         
         # ==========================
         # BLOQUE 1: Información General y Datos Clave (Cálculos Básicos)

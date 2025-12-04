@@ -142,8 +142,6 @@ def render():
         primary_blue = "deepskyblue"
         primary_pink = "hotpink"
 
-        info = ticker_data.info
-
         # ─── Conversión segura a numérico ───────────────────────────
         price = pd.to_numeric(info.get("currentPrice"), errors="coerce")
         dividend = pd.to_numeric(info.get("dividendRate"), errors="coerce")

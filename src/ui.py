@@ -1688,53 +1688,6 @@ def render():
         st.dataframe(df_otros)
         st.subheader("")
 
-    # --------------------------
-    # Sección: Análisis Fundamental Automatizado
-    # --------------------------
-    st.markdown("## 🤖 Análisis Fundamental Automatizado")
-    try:
-        # Calcular una puntuación según cuatro métodos de valoración
-        puntos = 0
-        conteo = 0
-        evaluaciones = [
-            ("Precio Infrav. G. Weiss", valor_infravalorado),
-            ("Valor Libro Precio Justo", fair_price),
-            ("Precio a PER 5 años", per_5y),
-            ("Precio por Dividendo Esperado", fair_div_price),
-        ]
-        for nombre, val in evaluaciones:
-            if val is not None and price is not None:
-                conteo += 1
-                diff = (val - price) / price
-                if diff >= 0.15:         # 15% o más infravalorada
-                    puntos += 1
-                elif diff >= -0.10:       # dentro de ±10% → precio justo
-                    puntos += 0.5
-                # si diff < -0.10 → sobrevalorada: 0 puntos
-    
-        # Determinar la valoración final y el color
-        if conteo > 0:
-            if puntos >= 3.5:
-                resultado = ("Infravalorada (Muy atractiva)", "green")
-            elif puntos >= 2:
-                resultado = ("A precio justo (Neutral)", "orange")
-            else:
-                resultado = ("Sobrevalorada (Precaución)", "red")
-        else:
-            resultado = ("Datos insuficientes", "gray")
-    
-        texto = (
-            f"**Opinión:** La acción se encuentra "
-            f"<span style='color:{resultado[1]}'>{resultado[0]}</span> "
-            f"basado en los {conteo} métodos de valoración analizados. "
-            "Se otorga 1 punto si el precio actual está al menos un 15% por debajo del valor estimado (infravalorada), "
-            "medio punto si está dentro de ±10% del valor estimado (a precio justo) y cero puntos si lo supera "
-            "(sobrevalorada). La suma total define el resultado final."
-        )
-        st.markdown(texto, unsafe_allow_html=True)
-    except Exception as e:
-        st.warning(f"No se pudo generar el análisis automatizado: {e}")
-
     
     except Exception as e:
         st.error(f"Ocurrió un error al obtener los datos: {e}")

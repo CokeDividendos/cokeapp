@@ -69,6 +69,14 @@ def render():
     unsafe_allow_html=True,
     )
 
+    # Botón para limpiar caché
+    if st.button("🔄 Refrescar caché"):
+        get_ticker_data.clear()        # borra cache de Ticker
+        safe_history.clear()           # borra cache de historiales de precios
+        history_resiliente.clear()     # borra cache del historials (resiliente)
+        st.success("Caché limpiado. Vuelve a introducir el ticker.")
+        st.stop()
+
     # Helper para resumen IA
     @cache_data(show_spinner="💬 Traduciendo y resumiendo…", ttl=60 * 60 * 24)
     def resumen_es(short_desc_en: str) -> str:

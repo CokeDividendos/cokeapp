@@ -110,7 +110,7 @@ def render():
     selected_interval = interval_dict[interval_label]
 
     try:
-        ticker_data = @st.cache_resource(ticker_input)
+        ticker_data = get_ticker_data(ticker_input)
         info = ticker_data.info or {}
         price_data = safe_history(
             ticker_input,
@@ -1588,15 +1588,17 @@ def render():
             else:
                 return ''  # Deja color por defecto (blanco) para 'Otros'
         
-        # Aplicar color a la columna 'Ratio' y formato de 2 decimales a todas las demás
+        # Definir el styler con colores y formato de dos decimales
         styler = (
             df_ratios_T
             .style
             .applymap(color_ratio, subset=['Ratio'])
             .format(precision=2, na_rep="–")
-            .hide_index()  # Oculta la columna de índices numéricos
+            .hide_index()  # Oculta la columna numérica del índice
         )
-
+        
+        # Mostrar la tabla
+        st.table(styler)
 
 
         # --------------------------

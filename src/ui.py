@@ -487,7 +487,7 @@ def render():
                     ]
                     ultimo_año = df_tabla["Año"].max()
                     last_dividend = df_tabla[df_tabla["Año"] == ultimo_año]["Dividendo Anual"].iloc[-1]
-                    current_price_gw = ticker_data.info.get("currentPrice", price_data_diario["Close"].iloc[-1])
+                    current_price_gw = info.get("currentPrice", price_data_diario["Close"].iloc[-1])
                     st.markdown("### 🚨 Datos Clave")
                     gw_cols = st.columns(7)
                     gw_cols[0].metric("Precio Actual", f"${current_price_gw:.2f}")
@@ -748,7 +748,7 @@ def render():
                     cash = bs.get("Cash")
                 net_debt = total_debt - cash if total_debt is not None and cash is not None else None
 
-                market_cap = ticker_data.info.get("marketCap")
+                market_cap = info.get("marketCap")
 
                 if ebitda is not None and net_debt is not None and market_cap is not None:
                     ev = market_cap + net_debt

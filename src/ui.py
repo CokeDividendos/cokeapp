@@ -1454,11 +1454,11 @@ def render():
         st.markdown("## 📊 Análisis Razonado")
 
         st.markdown(
-            "<em>Ratios de liquidez en <span style='color:green'>verde</span>, "
-            "endeudamiento en <span style='color:blue'>azul</span>, "
-            "gestión en <span style='color:hotpink'>rosado</span>, "
-            "rentabilidad en <span style='color:darkorange'>naranja</span> "
-            "y otros en blanco.</em>",
+            "<em><span style='color:green'>Ratios de Liquidez</span>, "
+            "<span style='color:blue'>Ratios de Endeudamiento</span>, "
+            "<span style='color:hotpink'>Ratios de Gestión</span>, "
+            "<span style='color:darkorange'>Ratios de Rentabilidad</span> "
+            "Otros ratios.</em>",
             unsafe_allow_html=True,
         )
 

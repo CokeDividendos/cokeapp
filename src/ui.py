@@ -1605,11 +1605,6 @@ def render():
         st.markdown("#### Tabla de Ratios (Años en columnas)")
         st.table(styler)
 
-                
-        # Mostrar la tabla en Streamlit
-        st.markdown("#### Tabla de Ratios (Años en columnas)")
-        st.table(styler)
-
 
         # --------------------------
         # Sección: Precios Objetivo (con entrada de Yield Deseado aquí)

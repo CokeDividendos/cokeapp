@@ -1565,8 +1565,6 @@ def render():
         
         # Asegurar que no haya columnas de años duplicadas (pero conservar los nombres de ratio)
         df_ratios_T = df_ratios_T.loc[:, ~df_ratios_T.columns.duplicated()]
-
-        
                 
         # Definir listas de categorías para colorear la columna 'Ratio'
         rat_liquidez = ["Razón Corriente", "Razón Ácida", "Capital de trabajo"]
@@ -1597,8 +1595,6 @@ def render():
             .hide_index()  # Oculta la columna numérica del índice
         )
         
-        # Mostrar la tabla
-        st.table(styler)
 
 
         # --------------------------

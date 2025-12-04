@@ -143,16 +143,28 @@ def render():
         primary_blue = "deepskyblue"
         primary_pink = "hotpink"
 
-        # ─── Conversión segura a numérico ───────────────────────────
+        # Datos financieros principales con fall-back
+        # Primer intento: usar el diccionario 'info'
         price = pd.to_numeric(info.get("currentPrice"), errors="coerce")
         dividend = pd.to_numeric(info.get("dividendRate"), errors="coerce")
         payout_ratio = pd.to_numeric(info.get("payoutRatio"), errors="coerce")
         pe_ratio = pd.to_numeric(info.get("trailingPE"), errors="coerce")
         roe_actual = pd.to_numeric(info.get("returnOnEquity"), errors="coerce")
-        eps_actual = pd.to_numeric(info.get("trailingEps"), errors="coerce")
+        # NOTA: usamos 'epsTrailingTwelveMonths' en vez de 'trailingEps', que suele estar vacío en algunos tickers
+        eps_actual = pd.to_numeric(info.get("epsTrailingTwelveMonths"), errors="coerce")
         pb = pd.to_numeric(info.get("priceToBook"), errors="coerce")
-
-        yield_actual = (dividend / price * 100) if pd.notna(dividend) and pd.notna(price) else None
+        
+        # Fall-back en caso de que el precio o dividendo sean NaN/None
+        if pd.isna(price) and not price_data.empty:
+            # utilizamos el último cierre disponible del DataFrame de precios
+            price = price_data["Close"].iloc[-1]
+        if pd.isna(dividend):
+            # utilizar el último dividendo conocido (lastDividendValue) o 0 si tampoco existe
+            dividend = pd.to_numeric(info.get("lastDividendValue"), errors="coerce")
+        
+        # Calcular el rendimiento (yield) sólo si existen precio y dividendo
+        yield_actual = (dividend / price * 100) if pd.notna(dividend) and pd.notna(price) and price > 0 else np.nan
+        
 
         # ─── Book Value / Share ─────────────────────────────────────
         bs = ticker_data.balance_sheet.transpose()

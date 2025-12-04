@@ -69,13 +69,6 @@ def render():
     unsafe_allow_html=True,
     )
 
-    # Botón para limpiar caché
-    if st.button("🔄 Refrescar caché"):
-        get_ticker_data.clear()        # borra cache de Ticker
-        safe_history.clear()           # borra cache de historiales de precios
-        history_resiliente.clear()     # borra cache del historials (resiliente)
-        st.success("Caché limpiado. Vuelve a introducir el ticker.")
-        st.stop()
 
     # Helper para resumen IA
     @cache_data(show_spinner="💬 Traduciendo y resumiendo…", ttl=60 * 60 * 24)
@@ -161,6 +154,18 @@ def render():
         # NOTA: usamos 'epsTrailingTwelveMonths' en vez de 'trailingEps', que suele estar vacío en algunos tickers
         eps_actual = pd.to_numeric(info.get("epsTrailingTwelveMonths"), errors="coerce")
         pb = pd.to_numeric(info.get("priceToBook"), errors="coerce")
+
+        # Si precio o dividendo aparecen NaN, intenta recargar la info
+        if pd.isna(price) or pd.isna(dividend):
+            # Limpia el cache para este ticker y obtén de nuevo los datos
+            get_ticker_data.clear()
+            ticker_data = get_ticker_data(ticker_input)
+            info = ticker_data.info or {}
+
+    # Recalcula precio y dividendo
+    price = pd.to_numeric(info.get("currentPrice"), errors="coerce")
+    dividend = pd.to_numeric(info.get("dividendRate"), errors="coerce")
+
         
         # Fall-back en caso de que el precio o dividendo sean NaN/None
         if pd.isna(price) and not price_data.empty:

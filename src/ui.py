@@ -146,13 +146,13 @@ def render():
         primary_pink = "hotpink"
 
         # ─── Conversión segura a numérico ───────────────────────────
-        price = pd.to_numeric(info.get("currentPrice"), errors="coerce")
-        dividend = pd.to_numeric(info.get("dividendRate"), errors="coerce")
-        payout_ratio = pd.to_numeric(info.get("payoutRatio"), errors="coerce")
-        pe_ratio = pd.to_numeric(info.get("trailingPE"), errors="coerce")
-        roe_actual = pd.to_numeric(info.get("returnOnEquity"), errors="coerce")
-        eps_actual = pd.to_numeric(info.get("trailingEps"), errors="coerce")
-        pb = pd.to_numeric(info.get("priceToBook"), errors="coerce")
+        price = pd.to_numeric(ticker_data.info("currentPrice"), errors="coerce")
+        dividend = pd.to_numeric(ticker_data.info("dividendRate"), errors="coerce")
+        payout_ratio = pd.to_numeric(ticker_data.info("payoutRatio"), errors="coerce")
+        pe_ratio = pd.to_numeric(ticker_data.info("trailingPE"), errors="coerce")
+        roe_actual = pd.to_numeric(ticker_data.info("returnOnEquity"), errors="coerce")
+        eps_actual = pd.to_numeric(ticker_data.info("trailingEps"), errors="coerce")
+        pb = pd.to_numeric(ticker_data.info("priceToBook"), errors="coerce")
 
         yield_actual = (dividend / price * 100) if pd.notna(dividend) and pd.notna(price) else None
 

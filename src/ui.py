@@ -1587,7 +1587,7 @@ def render():
             .applymap(color_ratio, subset=['Ratio'])
             .format(precision=2, na_rep="–")
         )
-        st.markdown("#### Tabla de Ratios (Años en columnas)")
+        st.markdown("#### Tabla de Ratios)")
         st.table(styler)
 
 

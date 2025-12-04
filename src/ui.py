@@ -1555,16 +1555,6 @@ def render():
             row["Valor bolsa/libro"] = safe_div(price, denominator) if denominator not in [None, 0] and price is not None else None
         
             ratios_list.append(row)
-        
-        # Crear el DataFrame con los ratios, indexar por año y redondear a 2 decimales
-        df_ratios = pd.DataFrame(ratios_list).set_index("Año").round(2)
-        
-        # Transponer: ratios en filas, años en columnas y convertir índice a columna 'Ratio'
-        df_ratios_T = df_ratios.transpose().reset_index().rename(columns={'index': 'Ratio'})
-
-        
-        # Asegurar que no haya columnas de años duplicadas (pero conservar los nombres de ratio)
-        df_ratios_T = df_ratios_T.loc[:, ~df_ratios_T.columns.duplicated()]
                 
         # Definir listas de categorías para colorear la columna 'Ratio'
         rat_liquidez = ["Razón Corriente", "Razón Ácida", "Capital de trabajo"]
@@ -1586,17 +1576,24 @@ def render():
             else:
                 return ''  # Deja color por defecto (blanco) para 'Otros'
         
-        # Definir el styler con colores y formato de dos decimales
+        # Transponer: ratios en filas, años en columnas y convertir índice a columna 'Ratio'
+        df_ratios_T = df_ratios.transpose().reset_index().rename(columns={'index': 'Ratio'})
+        # Eliminar columnas de años duplicados
+        df_ratios_T = df_ratios_T.loc[:, ~df_ratios_T.columns.duplicated()]
+        # Asignar índice vacío para ocultar la columna de numeración
+        df_ratios_T.index = [''] * len(df_ratios_T)
+        
+        # Definir el styler con colores y formato (sin hide_index)
         styler = (
             df_ratios_T
             .style
             .applymap(color_ratio, subset=['Ratio'])
             .format(precision=2, na_rep="–")
-            .hide_index()  # Oculta la columna numérica del índice
         )
         
         # Mostrar la tabla estilizada como HTML
         st.markdown(styler.to_html(), unsafe_allow_html=True)
+
 
         # --------------------------
         # Sección: Precios Objetivo (con entrada de Yield Deseado aquí)

@@ -10,7 +10,7 @@ from .services.cache import cache_data
 
 # Cachea el objeto Ticker por 24 h para evitar llamadas repetidas
 @cache_data(show_spinner=False, ttl=60*60*24)
-def get_ticker_data(ticker):
+def @st.cache_resource(ticker):
     return yf.Ticker(ticker, session=YF_SESSION)
 
 def render():
@@ -109,7 +109,7 @@ def render():
     selected_interval = interval_dict[interval_label]
 
     try:
-        ticker_data = get_ticker_data(ticker_input)
+        ticker_data = @st.cache_resource(ticker_input)
         info = ticker_data.info or {}
         price_data = safe_history(
             ticker_input,

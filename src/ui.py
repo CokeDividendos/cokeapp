@@ -1567,8 +1567,6 @@ def render():
         # Transponer: ratios en filas, años en columnas y convertir índice a columna 'Ratio'
         df_ratios_T = df_ratios.transpose().reset_index().rename(columns={'index': 'Ratio'})
 
-        # Mover el índice a una columna llamada 'Ratio'
-        df_ratios_T = df_ratios_T.reset_index().rename(columns={'index': 'Ratio'})
         
         # Asegurar que no haya columnas de años duplicadas (pero conservar los nombres de ratio)
         df_ratios_T = df_ratios_T.loc[:, ~df_ratios_T.columns.duplicated()]

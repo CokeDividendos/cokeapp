@@ -162,9 +162,9 @@ def render():
             ticker_data = get_ticker_data(ticker_input)
             info = ticker_data.info or {}
 
-    # Recalcula precio y dividendo
-    price = pd.to_numeric(info.get("currentPrice"), errors="coerce")
-    dividend = pd.to_numeric(info.get("dividendRate"), errors="coerce")
+            # Recalcula precio y dividendo
+            price = pd.to_numeric(info.get("currentPrice"), errors="coerce")
+            dividend = pd.to_numeric(info.get("dividendRate"), errors="coerce")
 
         
         # Fall-back en caso de que el precio o dividendo sean NaN/None

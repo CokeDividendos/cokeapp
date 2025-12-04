@@ -1595,8 +1595,8 @@ def render():
             .hide_index()  # Oculta la columna numérica del índice
         )
         
-        # Mostrar la tabla
-        st.table(styler)
+        # Mostrar la tabla estilizada como HTML
+        st.markdown(styler.to_html(), unsafe_allow_html=True)
 
         # --------------------------
         # Sección: Precios Objetivo (con entrada de Yield Deseado aquí)

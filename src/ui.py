@@ -8,6 +8,10 @@ from .auth import get_nombre_usuario
 from .services.yf_client import YF_SESSION, safe_history, history_resiliente, get_logo_url
 from .services.cache import cache_data
 
+# Cachea el objeto Ticker por 24 h para evitar llamadas repetidas
+@cache_data(show_spinner=False, ttl=60*60*24)
+def get_ticker_data(ticker):
+    return yf.Ticker(ticker, session=YF_SESSION)
 
 def render():
     # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
@@ -92,7 +96,6 @@ def render():
         "<h3 style='text-align:center;'>Hola 👋</h3>",
         unsafe_allow_html=True,
     )
-
     # ------------------------------ ENTRADAS PRINCIPALES -------------------------------
     col_logo, col_title = st.columns([1, 5])
     ticker_input = st.text_input("🔎 Ticker (ej.: AAPL, MSFT, KO)", "AAPL")
@@ -106,7 +109,7 @@ def render():
     selected_interval = interval_dict[interval_label]
 
     try:
-        ticker_data = yf.Ticker(ticker_input, session=YF_SESSION)
+        ticker_data = get_ticker_data(ticker_input)
         info = ticker_data.info or {}
         price_data = safe_history(
             ticker_input,
@@ -130,15 +133,6 @@ def render():
         # Resumen IA
         if info.get("longBusinessSummary"):
             st.write(resumen_es(info["longBusinessSummary"]))
-
-
-        # A partir de aquí TODO tu código de métricas, gráficos, etc. permanece igual
-        #  (no lo repito para ahorrar espacio — no lo borres en tu archivo)
-        # ----------------------------------------------------------------------------------
-
-        # ……………………………………………………………………………………………………………………………………
-        # 👇  PEGAR AQUÍ el resto de tu lógica (BLOQUES 1-6) tal cual la tenías
-        # ……………………………………………………………………………………………………………………………………
 
         # ==========================
         # BLOQUE 1: Información General y Datos Clave (Cálculos Básicos)
@@ -436,7 +430,7 @@ def render():
             st.subheader(f"Método Geraldine Weiss: Datos, Resumen y Gráfico")
             try:
                 dividends = ticker_data.dividends
-                price_data_diario = ticker_data.history(period=selected_period, interval="1d")
+                price_data_diario = safe_history(ticker_input, period=selected_period, interval="1d")
                 if dividends.empty or price_data_diario.empty:
                     st.warning("No hay datos suficientes para calcular el Método Geraldine Weiss.")
                 else:
@@ -1599,9 +1593,9 @@ def render():
             .style
             .applymap(color_ratio, subset=['Ratio'])
             .format(precision=2, na_rep="–")
+            .hide_index()  # Oculta la columna de índices numéricos
         )
-        st.markdown("#### Tabla de Ratios (Años en columnas)")
-        st.table(styler)
+
 
 
         # --------------------------
@@ -1612,7 +1606,7 @@ def render():
         key_cols = st.columns(4)
         key_cols[0].metric("💰 Precio Actual", f"${price:.2f}" if price is not None else "N/A")
         # Para calcular el Valor Infravalorado de Geraldine Weiss se utiliza la metodología a partir de datos diarios:
-        price_data_diario = ticker_data.history(period=selected_period, interval="1d")
+        price_data_diario = safe_history(ticker_input, period=selected_period, interval="1d")
         dividends_daily = ticker_data.dividends
         if not dividends_daily.empty:
             annual_dividends_raw = dividends_daily.resample("Y").sum()
@@ -1699,6 +1693,54 @@ def render():
         st.markdown("### Datos Relevantes")
         st.dataframe(df_otros)
         st.subheader("")
+    # --------------------------
+    # Sección: Análisis Fundamental Automatizado
+    # --------------------------
+    st.markdown("## 🤖 Análisis Fundamental Automatizado")
+    try:
+        # Calcular una puntuación según cuatro métodos de valoración
+        puntos = 0
+        conteo = 0
+        evaluaciones = [
+            ("Precio Infrav. G. Weiss", valor_infravalorado),
+            ("Valor Libro Precio Justo", fair_price),
+            ("Precio a PER 5 años", per_5y),
+            ("Precio por Dividendo Esperado", fair_div_price),
+        ]
+        for nombre, val in evaluaciones:
+            if val is not None and price is not None:
+                conteo += 1
+                diff = (val - price) / price
+                if diff >= 0.15:         # 15% o más infravalorada
+                    puntos += 1
+                elif diff >= -0.10:       # dentro de ±10% → precio justo
+                    puntos += 0.5
+                # si diff < -0.10 → sobrevalorada: 0 puntos
+    
+        # Determinar la valoración final y el color
+        if conteo > 0:
+            if puntos >= 3.5:
+                resultado = ("Infravalorada (Muy atractiva)", "green")
+            elif puntos >= 2:
+                resultado = ("A precio justo (Neutral)", "orange")
+            else:
+                resultado = ("Sobrevalorada (Precaución)", "red")
+        else:
+            resultado = ("Datos insuficientes", "gray")
+    
+        texto = (
+            f"**Opinión:** La acción se encuentra "
+            f"<span style='color:{resultado[1]}'>{resultado[0]}</span> "
+            f"basado en los {conteo} métodos de valoración analizados. "
+            "Se otorga 1 punto si el precio actual está al menos un 15% por debajo del valor estimado (infravalorada), "
+            "medio punto si está dentro de ±10% del valor estimado (a precio justo) y cero puntos si lo supera "
+            "(sobrevalorada). La suma total define el resultado final."
+        )
+        st.markdown(texto, unsafe_allow_html=True)
+    except Exception as e:
+        st.warning(f"No se pudo generar el análisis automatizado: {e}")
 
+
+    
     except Exception as e:
         st.error(f"Ocurrió un error al obtener los datos: {e}")

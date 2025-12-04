@@ -8,10 +8,11 @@ from .auth import get_nombre_usuario
 from .services.yf_client import YF_SESSION, safe_history, history_resiliente, get_logo_url
 from .services.cache import cache_data
 
-# Cachea el objeto Ticker por 24 h para evitar llamadas repetidas
-@cache_data(show_spinner=False, ttl=60*60*24)
-def @st.cache_resource(ticker):
+# Cachea el objeto Ticker como recurso. Esto evita serializarlo con pickle.
+@st.cache_resource(show_spinner=False)
+def get_ticker_data(ticker):
     return yf.Ticker(ticker, session=YF_SESSION)
+
 
 def render():
     # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────

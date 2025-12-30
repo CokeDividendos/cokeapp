@@ -4,7 +4,12 @@ import os, textwrap
 import streamlit as st
 import pandas as pd, plotly.graph_objects as go, plotly.express as px, numpy as np
 import yfinance as yf
-from .auth import get_nombre_usuario
+# src/ui.py (al principio del archivo)
+import streamlit as st
+from .auth import login
+from .db import init_user_table
+from .services.yf_client import get_logo_url, safe_history, history_resiliente
+# … otras importaciones se mantienen iguales …
 from .services.yf_client import YF_SESSION, safe_history, history_resiliente, get_logo_url
 from .services.cache import cache_data
 from .auth import login

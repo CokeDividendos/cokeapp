@@ -1,19 +1,16 @@
 # ╔═════════════  Coke-App v0.4  (logo, sector/industria, resumen-IA, UI móvil) ═════════════╗
 # 1) IMPORTS & CONFIG
-import os, textwrap
-import streamlit as st
-import pandas as pd, plotly.graph_objects as go, plotly.express as px, numpy as np
+import textwrap
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
 import yfinance as yf
-# src/ui.py (al principio del archivo)
-import streamlit as st
 from .auth import login
 from .db import init_user_table
-from .services.yf_client import get_logo_url, safe_history, history_resiliente
-# … otras importaciones se mantienen iguales …
-from .services.yf_client import YF_SESSION, safe_history, history_resiliente, get_logo_url
 from .services.cache import cache_data
-from .auth import login
-from .db import init_user_table
+from .services.yf_client import YF_SESSION, get_logo_url, history_resiliente, safe_history
 
 # Cachea el objeto Ticker como recurso. Esto evita serializarlo con pickle.
 @st.cache_resource(show_spinner=False)
@@ -22,7 +19,6 @@ def get_ticker_data(ticker):
 
 
 def render():
-    def render():
     # Configurar la página
     st.set_page_config(layout="wide")
 
@@ -35,13 +31,6 @@ def render():
         st.stop()
 
     # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
-    # … configuración previa …
-    init_user_table()
-
-    # Comprobar si el usuario está autenticado
-    if "user" not in st.session_state:
-        login()
-        st.stop()  # Evita cargar el resto de la app mientras no haya sesión
         
     st.markdown(
     """
@@ -162,7 +151,6 @@ def render():
         logo_url = get_logo_url(info)
         
         # Ruta al logo genérico (asegúrate de que exista en tu proyecto)
-        from pathlib import Path
         placeholder_path = Path("assets") / "Logo.png"
         
         with col_logo:
@@ -192,7 +180,6 @@ def render():
         dividend = pd.to_numeric(info.get("dividendRate"), errors="coerce")
         # Si precio o dividendo son NaN, intenta recargar la info una vez
         if pd.isna(price) or pd.isna(dividend):
-            from .auth import get_ticker_data
             get_ticker_data.clear()
             ticker_data = get_ticker_data(ticker_input)
             info = ticker_data.info or {}

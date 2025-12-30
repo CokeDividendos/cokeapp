@@ -7,6 +7,8 @@ import yfinance as yf
 from .auth import get_nombre_usuario
 from .services.yf_client import YF_SESSION, safe_history, history_resiliente, get_logo_url
 from .services.cache import cache_data
+from .auth import login
+from .db import init_user_table
 
 # Cachea el objeto Ticker como recurso. Esto evita serializarlo con pickle.
 @st.cache_resource(show_spinner=False)
@@ -16,6 +18,14 @@ def get_ticker_data(ticker):
 
 def render():
     # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
+    # … configuración previa …
+    init_user_table()
+
+    # Comprobar si el usuario está autenticado
+    if "user" not in st.session_state:
+        login()
+        st.stop()  # Evita cargar el resto de la app mientras no haya sesión
+        
     st.markdown(
     """
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -163,6 +173,21 @@ def render():
         # Primer intento: usar el diccionario 'info'
         price = pd.to_numeric(info.get("currentPrice"), errors="coerce")
         dividend = pd.to_numeric(info.get("dividendRate"), errors="coerce")
+        # Si precio o dividendo son NaN, intenta recargar la info una vez
+        if pd.isna(price) or pd.isna(dividend):
+            from .auth import get_ticker_data
+            get_ticker_data.clear()
+            ticker_data = get_ticker_data(ticker_input)
+            info = ticker_data.info or {}
+            price = pd.to_numeric(info.get("currentPrice"), errors="coerce")
+            dividend = pd.to_numeric(info.get("dividendRate"), errors="coerce")
+            
+        # Fallbacks finales
+        if pd.isna(price) and not price_data.empty:
+            price = price_data["Close"].iloc[-1]
+        if pd.isna(dividend):
+            dividend = pd.to_numeric(info.get("lastDividendValue"), errors="coerce")
+        
         payout_ratio = pd.to_numeric(info.get("payoutRatio"), errors="coerce")
         pe_ratio = pd.to_numeric(info.get("trailingPE"), errors="coerce")
         roe_actual = pd.to_numeric(info.get("returnOnEquity"), errors="coerce")
@@ -1615,8 +1640,12 @@ def render():
             .format(precision=2, na_rep="–")
         )
         st.markdown("#### Tabla de Ratios")
-        st.table(styler)
-
+        
+        # Establecer índice vacío para ocultar numeración
+        df_ratios_T.index = [""] * len(df_ratios_T)
+    
+        # … (crear styler como ya lo tienes) …
+        st.markdown(styler.to_html(), unsafe_allow_html=True)
 
 
         # --------------------------

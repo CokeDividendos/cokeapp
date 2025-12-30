@@ -1,27 +1,30 @@
 # src/auth.py
+
 import streamlit as st
+from .db import init_user_table, get_user
+import hashlib
 
-def login_required() -> bool:
-    """
-    Stub de autenticación: siempre devuelve True.
-    La aplicación se carga sin requerir login.
-    """
-    return True
+def hash_password(password: str) -> str:
+    """Devuelve el hash SHA256 de la contraseña."""
+    return hashlib.sha256(password.encode()).hexdigest()
 
-def get_nombre_usuario() -> str:
-    """
-    Devuelve un nombre vacío.
-    """
-    return ""
+def login():
+    """Formulario de inicio de sesión con correo y contraseña."""
+    st.markdown("## Inicia sesión")
+    email = st.text_input("Correo electrónico")
+    password = st.text_input("Contraseña", type="password")
 
-def get_tipo_plan() -> str:
-    """
-    Devuelve un plan vacío o 'free' si prefieres mostrar algo.
-    """
-    return ""
+    if st.button("Ingresar"):
+        if not email or not password:
+            st.error("Por favor, introduce correo y contraseña.")
+            st.stop()
 
-def logout_button():
-    """
-    No hace nada. Mantenida por compatibilidad con main.py.
-    """
-    pass
+        usuario = get_user(email)
+        if usuario and usuario[1] == hash_password(password):
+            # Autenticado correctamente
+            st.session_state["user"] = email
+            st.success("Sesión iniciada correctamente.")
+            st.experimental_rerun()
+        else:
+            st.error("Correo o contraseña incorrectos.")
+            st.stop()

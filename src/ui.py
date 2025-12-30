@@ -131,13 +131,21 @@ def render():
             st.stop()
 
         # Logo + Título
+        # Previamente: logo_url = get_logo_url(info)
         logo_url = get_logo_url(info)
+        
+        # Ruta al logo genérico (asegúrate de que exista en tu proyecto)
+        from pathlib import Path
+        placeholder_path = Path("assets") / "Logo.png"
+        
         with col_logo:
             if logo_url:
+                # Mostramos el logo de la empresa
                 st.image(logo_url, width=90)
-        with col_title:
-            st.title(f" {info.get('longName', ticker_input)}")
-            st.markdown(f"**Sector:** {info.get('sector','N/D')}   |   **Industria:** {info.get('industry','N/D')}")
+            else:
+                # Si no hay logo válido, mostramos un placeholder
+                if placeholder_path.exists():
+                    st.image(str(placeholder_path), width=60)
 
         # Resumen IA
         if info.get("longBusinessSummary"):

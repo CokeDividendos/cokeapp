@@ -22,6 +22,18 @@ def get_ticker_data(ticker):
 
 
 def render():
+    def render():
+    # Configurar la página
+    st.set_page_config(layout="wide")
+
+    # Asegura que la tabla de usuarios exista
+    init_user_table()
+
+    # Verificar si hay una sesión de usuario; si no, mostrar el formulario de login
+    if "user" not in st.session_state:
+        login()
+        st.stop()
+
     # ───── 1-B  CSS responsive minimal (look Fintual) ───────────────────────────────────────────
     # … configuración previa …
     init_user_table()

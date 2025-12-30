@@ -6,6 +6,7 @@ import tenacity
 import pandas as pd
 import streamlit as st
 from .cache import install_cache, cache_data
+from urllib.parse import urlparse
 
 # Configura caché HTTP (requests-cache) con expiración de 24 h
 install_cache()
@@ -52,12 +53,45 @@ def history_resiliente(ticker: str, *, period: str, interval: str) -> pd.DataFra
         raise
 
 @cache_data(show_spinner=False, ttl=60 * 60 * 24)
-def get_logo_url(info: dict) -> str | None:
-    """Devuelve el logo de la empresa desde info['logo_url'] o vía Clearbit."""
-    if logo := info.get("logo_url"):
-        return logo
-    domain = (info.get("website") or "").split("//")[-1].split("/")[0]
-    if domain:
-        return f"https://logo.clearbit.com/{domain}"
-    return None
+from urllib.parse import urlparse
+
+def get_logo_url(info: dict | None) -> str | None:
+    """
+    Devuelve la URL del logo de la empresa.
+    1. Usa info["logo_url"] si está disponible.
+    2. Si no, usa info["website"] para extraer el dominio y construir la URL de Clearbit.
+    3. Retorna None si no hay sitio web válido.
+    """
+    if not info or not isinstance(info, dict):
+        return None
+
+    # 1) Si info['logo_url'] existe, úsalo
+    logo_url = info.get("logo_url")
+    if logo_url:
+        return logo_url
+
+    # 2) Si no, intenta obtener el dominio desde el sitio web
+    website = info.get("website")
+    if not website or not isinstance(website, str):
+        return None
+
+    website = website.strip()
+    if not website:
+        return None
+
+    # Asegurarse de que tenga protocolo
+    if not website.startswith(("http://", "https://")):
+        website = "https://" + website
+
+    try:
+        parsed = urlparse(website)
+        domain = parsed.netloc.replace("www.", "")
+        # Si el dominio está vacío, no hay logo
+        if not domain:
+            return None
+        # Devuelve la URL de Clearbit
+        return f"https://logo.clearbit.com/{domain}?size=160"
+    except Exception:
+        return None
+
 

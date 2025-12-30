@@ -6,7 +6,6 @@ import tenacity
 import pandas as pd
 import streamlit as st
 from .cache import install_cache, cache_data
-from urllib.parse import urlparse
 
 # Configura caché HTTP (requests-cache) con expiración de 24 h
 install_cache()

@@ -1,92 +1,45 @@
 # src/db.py
+
 import sqlite3
 from pathlib import Path
-import datetime
+import hashlib
 
-# La BD se guardará junto a este archivo
-DB_PATH = Path(__file__).parent / "cokeapp.sqlite"
+# Establecer el path de la base de datos
+DB_PATH = Path(__file__).resolve().parent / "cokeapp.sqlite"
 
-def listar_usuarios():
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT id, email, nombre FROM usuarios")
-    rows = cur.fetchall()
-    conn.close()
-    return rows
-
-def init_db():
-    """
-    Crea la tabla de usuarios si no existe y agrega un usuario admin
-    con tu correo. Si ya existe, lo deja intacto.
-    """
+def init_user_table():
+    """Crea la tabla de usuarios si no existe."""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        nombre TEXT,
-        tipo_plan TEXT DEFAULT 'free',  -- free, premium, admin
-        api_key TEXT,
-        fecha_expiracion TEXT,
-        fecha_registro TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+        CREATE TABLE IF NOT EXISTS usuarios (
+            email TEXT PRIMARY KEY,
+            password_hash TEXT NOT NULL,
+            fecha_registro TEXT DEFAULT CURRENT_TIMESTAMP
+        );
     """)
-    # ⚠️ Sustituye el correo y el nombre con los tuyos antes de guardar el archivo
-    default_admin_email = "cokedividendos@gmail.com"
-    default_admin_nombre = "Coke"
-    cur.execute("SELECT * FROM usuarios WHERE email = ?", (default_admin_email,))
-    if not cur.fetchone():
-        cur.execute("""
-            INSERT INTO usuarios (email, nombre, tipo_plan)
-            VALUES (?, ?, 'admin')
-        """, (default_admin_email, default_admin_nombre))
+    conn.commit()
+    conn.close()
+
+def insert_user(email: str, password: str) -> bool:
+    """Inserta un usuario con hash de contraseña; retorna False si ya existe."""
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO usuarios (email, password_hash) VALUES (?, ?)", (email, password_hash))
         conn.commit()
-    conn.close()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
 
-def get_user_by_email(email):
+def get_user(email: str):
+    """Obtiene la fila del usuario (email, password_hash)."""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("SELECT * FROM usuarios WHERE email = ?", (email,))
-    user = cur.fetchone()
+    cur.execute("SELECT email, password_hash FROM usuarios WHERE email = ?", (email,))
+    row = cur.fetchone()
     conn.close()
-    return user
-
-def update_user_plan(email, tipo_plan, fecha_expiracion=None):
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE usuarios SET tipo_plan = ?, fecha_expiracion = ? WHERE email = ?",
-        (tipo_plan, fecha_expiracion, email)
-    )
-    conn.commit()
-    conn.close()
-
-def set_user_api_key(email, api_key):
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE usuarios SET api_key = ? WHERE email = ?",
-        (api_key, email)
-    )
-    conn.commit()
-    conn.close()
-
-def upsert_user(email: str, **fields) -> None:
-    """Update or insert a user record with the given fields."""
-    if not fields:
-        return
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    placeholders = ", ".join(f"{k} = ?" for k in fields)
-    values = list(fields.values()) + [email]
-    cur.execute(f"UPDATE usuarios SET {placeholders} WHERE email = ?", values)
-    if cur.rowcount == 0:
-        cols = ",".join(["email"] + list(fields.keys()))
-        qs = ",".join(["?"] * (len(fields) + 1))
-        cur.execute(
-            f"INSERT INTO usuarios ({cols}) VALUES ({qs})",
-            [email, *fields.values()]
-        )
-    conn.commit()
-    conn.close()
+    return row
